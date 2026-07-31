@@ -11,10 +11,10 @@ let isPaused = false;
 const MAX_MISTAKES = 3;
 
 // Difficulty Limits
-let hintsRemaining = 3;
-let undosRemaining = 3;
+let hintsRemaining = 2;
+let undosRemaining = 2;
 
-// Lifetime Statistics
+// Performance Statistics Storage
 let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
   played: 0,
   won: 0,
@@ -54,7 +54,7 @@ function startNewGame() {
   boardEl.classList.remove('paused');
   pauseOverlay.classList.remove('active');
 
-  // Set limits based on selected difficulty
+  // Set limits depending on difficulty selection
   const diff = difficultyEl.value;
   if (diff === 'easy') {
     hintsRemaining = 3;
@@ -125,7 +125,7 @@ function shuffle(array) {
   return arr;
 }
 
-// Fast Generator
+// Instant & Crash-Proof Generator
 function generateSudoku() {
   const base = [
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -329,7 +329,7 @@ function endGame(isWin) {
     showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl.textContent}!`);
   } else {
     stats.losses++;
-    showEndModal("❌ Game Over", "You made 3 mistakes and lost.");
+    showEndModal("❌ Game Over", "You reached 3 mistakes and lost.");
   }
 
   localStorage.setItem('sudoku_stats', JSON.stringify(stats));
@@ -403,5 +403,4 @@ function setupEventListeners() {
       themeToggle.textContent = '☀️ Light';
     }
   });
-    }
-    
+}
