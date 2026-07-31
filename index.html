@@ -1,65 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="google-site-verification" content="WCdH_dWJa5r5mU8j4XKEk5EPLv9lSC0jCVbEu7FPNqk" />
-    <title>Mobile Sudoku</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sudoku Master</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    
-    <div class="navbar">
-    <h1>Sudoku</h1>
-    <div class="game-stats">
-        <span id="timer">Time: 00:00</span>
-        <span id="mistakes-display">Mistakes: 0/3</span>
-    </div>
-    <button id="theme-toggle-btn" onclick="toggleDarkMode()">🌙</button>
-</div>
 
-<div class="game-controls">
-    <label for="difficulty">Level:</label>
-    <select id="difficulty">
+<div class="container">
+  <header>
+    <h1>Sudoku</h1>
+    <button class="theme-btn" id="theme-toggle">🌙 Dark</button>
+  </header>
+
+  <div class="status-bar">
+    <div class="status-item">
+      <span>Difficulty:</span>
+      <select id="difficulty">
         <option value="easy">Easy</option>
         <option value="medium" selected>Medium</option>
         <option value="hard">Hard</option>
-    </select>
-    <button id="new-game-btn">New Game</button>
+      </select>
+    </div>
+    <div class="status-item">
+      <span>Mistakes:</span>
+      <strong id="mistakes-count" class="mistake-text">0/3</strong>
+    </div>
+    <div class="status-item">
+      <span>Time:</span>
+      <strong id="timer">00:00</strong>
+    </div>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div class="action-buttons">
+    <button class="btn" id="btn-undo">Undo</button>
+    <button class="btn" id="btn-hint">Hint</button>
+    <button class="btn" id="btn-erase">Erase</button>
+    <button class="btn btn-secondary" id="btn-stats">Stats</button>
+    <button class="btn btn-secondary" id="btn-new">New Game</button>
+  </div>
+
+  <div class="keypad" id="keypad"></div>
 </div>
 
+<div class="modal-overlay" id="game-modal">
+  <div class="modal-content">
+    <h2 id="modal-title">Game Over</h2>
+    <p id="modal-message">You reached 3 mistakes!</p>
+    <div class="stats-summary" id="modal-stats"></div>
+    <button class="btn modal-btn" id="modal-close-btn">Play Again</button>
+  </div>
+</div>
 
-    <div id="sudoku-board"></div>
-
-    <div id="numpad">
-        <button class="num-btn" onclick="selectInputNumber(1)">1</button>
-        <button class="num-btn" onclick="selectInputNumber(2)">2</button>
-        <button class="num-btn" onclick="selectInputNumber(3)">3</button>
-        <button class="num-btn" onclick="selectInputNumber(4)">4</button>
-        <button class="num-btn" onclick="selectInputNumber(5)">5</button>
-        <button class="num-btn" onclick="selectInputNumber(6)">6</button>
-        <button class="num-btn" onclick="selectInputNumber(7)">7</button>
-        <button class="num-btn" onclick="selectInputNumber(8)">8</button>
-        <button class="num-btn" onclick="selectInputNumber(9)">9</button>
-        <button class="num-btn clear-btn" onclick="selectInputNumber('')">CL</button>
+<div class="modal-overlay" id="stats-modal">
+  <div class="modal-content">
+    <h2>Performance Analysis</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-number" id="stat-played">0</span>
+        <span class="stat-label">Played</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="stat-won">0</span>
+        <span class="stat-label">Won</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="stat-winrate">0%</span>
+        <span class="stat-label">Win Rate</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="stat-besttime">--:--</span>
+        <span class="stat-label">Best Time</span>
+      </div>
     </div>
+    <button class="btn modal-btn" id="stats-close-btn">Close</button>
+  </div>
+</div>
 
-    <div id="win-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>🎉 Puzzle Solved! 🎉</h2>
-            <p id="win-time-text">You solved it in 00:00!</p>
-            <button id="play-again-btn" onclick="startNewGame()">Play Again</button>
-        </div>
-    </div>
-
-    <div id="lose-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2 style="color: #d9534f;">❌ Game Over ❌</h2>
-            <p>You made 3 mistakes!</p>
-            <button id="try-again-btn" onclick="startNewGame()">Try Again</button>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
