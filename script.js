@@ -255,5 +255,30 @@ function toggleDarkMode() {
     }
 }
 
+// Get the dropdown element
+const difficultySelect = document.getElementById('difficulty');
+const newGameBtn = document.getElementById('new-game-btn');
+
+newGameBtn.addEventListener('click', () => {
+    const selectedDifficulty = difficultySelect.value;
+    
+    // Call your game generator function and pass the difficulty
+    startNewGame(selectedDifficulty);
+});
+
+function startNewGame(difficulty) {
+    let cellsToRemove = 40; // default medium
+
+    if (difficulty === 'easy') {
+        cellsToRemove = 30;
+    } else if (difficulty === 'hard') {
+        cellsToRemove = 55;
+    }
+
+    console.log(`Starting a ${difficulty} game by removing ${cellsToRemove} cells.`);
+    // TODO: Add your logic here to generate the puzzle and fill the grid
+}
+
+
 startNewGame();
               
