@@ -1,281 +1,342 @@
- let currentPuzzle = { initial: [], solved: [] };
+// Game State
+let solution = [];
+let initialBoard = [];
+let currentBoard = [];
+let historyStack = [];
 let selectedCell = null;
-let activeNumber = null;
-let secondsElapsed = 0;
 let timerInterval = null;
+let secondsElapsed = 0;
 let mistakes = 0;
+const MAX_MISTAKES = 3;
 
-function isValid(board, row, col, num) {
-    for (let i = 0; i < 9; i++) {
-        if (board[row][i] === num || board[i][col] === num) return false;
+// Performance Statistics Storage
+let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
+  played: 0,
+  won: 0,
+  losses: 0,
+  bestTime: null
+};
 
-        const boxRow = Math.floor(row / 3) * 3 + Math.floor(i / 3);
-        const boxCol = Math.floor(col / 3) * 3 + (i % 3);
-        if (board[boxRow][boxCol] === num) return false;
-    }
-    return true;
+// DOM Elements
+const boardEl = document.getElementById('board');
+const keypadEl = document.getElementById('keypad');
+const timerEl = document.getElementById('timer');
+const mistakesEl = document.getElementById('mistakes-count');
+const difficultyEl = document.getElementById('difficulty');
+const themeToggle = document.getElementById('theme-toggle');
+
+// Modals
+const gameModal = document.getElementById('game-modal');
+const statsModal = document.getElementById('stats-modal');
+
+window.onload = () => {
+  buildKeypad();
+  startNewGame();
+  setupEventListeners();
+};
+
+function startNewGame() {
+  clearInterval(timerInterval);
+  secondsElapsed = 0;
+  mistakes = 0;
+  updateMistakesDisplay();
+  updateTimerDisplay();
+
+  timerInterval = setInterval(() => {
+    secondsElapsed++;
+    updateTimerDisplay();
+  }, 1000);
+
+  generateSudoku();
+  historyStack = [];
+  selectedCell = null;
+  renderBoard();
 }
 
-function fillBoard(board) {
-    for (let row = 0; row < 9; row++) {
-        for (let col = 0; col < 9; col++) {
-            if (board[row][col] === 0) {
-                const nums = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
-
-                for (let num of nums) {
-                    if (isValid(board, row, col, num)) {
-                        board[row][col] = num;
-                        if (fillBoard(board)) return true;
-                        board[row][col] = 0;
-                    }
-                }
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-function generatePuzzle(cluesToRemove = 40) {
-    const solvedBoard = Array.from({ length: 9 }, () => Array(9).fill(0));
-    fillBoard(solvedBoard);
-    const initialBoard = solvedBoard.map(row => [...row]);
-
-    let removed = 0;
-    while (removed < cluesToRemove) {
-        const row = Math.floor(Math.random() * 9);
-        const col = Math.floor(Math.random() * 9);
-
-        if (initialBoard[row][col] !== 0) {
-            initialBoard[row][col] = 0;
-            removed++;
-        }
-    }
-
-    return {
-        initial: initialBoard,
-        solved: solvedBoard
-    };
-}
-
-function createBoard(difficulty = 'medium') {
-    let cellsToRemove = 40; // default medium
-
-    if (difficulty === 'easy') {
-        cellsToRemove = 30;
-    } else if (difficulty === 'hard') {
-        cellsToRemove = 55;
-    }
-
-    currentPuzzle = generatePuzzle(cellsToRemove);
-    const boardContainer = document.getElementById("sudoku-board");
-    boardContainer.innerHTML = "";
-    selectedCell = null;
-    activeNumber = null;
-    document.querySelectorAll(".num-btn").forEach(btn => btn.classList.remove("active-num"));
-
-    for (let row = 0; row < 9; row++) {
-        for (let col = 0; col < 9; col++) {
-            const cellValue = currentPuzzle.initial[row][col];
-            const cell = document.createElement("div");
-            cell.classList.add("cell");
-
-            cell.dataset.row = row;
-            cell.dataset.col = col;
-
-            if (row === 2 || row === 5) {
-                cell.classList.add(`cell-row-${row}`);
-            }
-
-            if (cellValue !== 0) {
-                cell.innerText = cellValue;
-                cell.classList.add("prefilled");
-            }
-
-            cell.addEventListener("click", () => selectCell(cell));
-            boardContainer.appendChild(cell);
-        }
-    }
-}
-
-function selectCell(cell) {
-    const cells = document.querySelectorAll(".cell");
-
-    cells.forEach(c => {
-        c.classList.remove("selected", "related");
-    });
-
-    selectedCell = cell;
-    const selectedRow = parseInt(cell.dataset.row);
-    const selectedCol = parseInt(cell.dataset.col);
-    const selectedBoxRow = Math.floor(selectedRow / 3);
-    const selectedBoxCol = Math.floor(selectedCol / 3);
-
-    cells.forEach(c => {
-        const row = parseInt(c.dataset.row);
-        const col = parseInt(c.dataset.col);
-        const boxRow = Math.floor(row / 3);
-        const boxCol = Math.floor(col / 3);
-
-        if (row === selectedRow || col === selectedCol || (boxRow === selectedBoxRow && boxCol === selectedBoxCol)) {
-            c.classList.add("related");
-        }
-    });
-
-    selectedCell.classList.add("selected");
-
-    if (activeNumber !== null && !cell.classList.contains("prefilled")) {
-        applyNumberToCell(activeNumber);
-    }
-}
-
-function selectInputNumber(num) {
-    const buttons = document.querySelectorAll(".num-btn");
-    buttons.forEach(btn => btn.classList.remove("active-num"));
-
-    if (activeNumber === num) {
-        activeNumber = null;
-    } else {
-        activeNumber = num;
-        event.target.classList.add("active-num");
-    }
-
-    if (selectedCell && !selectedCell.classList.contains("prefilled")) {
-        applyNumberToCell(activeNumber);
-    }
-}
-
-function applyNumberToCell(num) {
-    if (num === "") {
-        selectedCell.innerText = "";
-        selectedCell.classList.remove("user-input", "error");
-        return;
-    }
-
-    const row = parseInt(selectedCell.dataset.row);
-    const col = parseInt(selectedCell.dataset.col);
-    const correctValue = currentPuzzle.solved[row][col];
-
-    selectedCell.innerText = num;
-    selectedCell.classList.add("user-input");
-
-    if (num !== correctValue) {
-        selectedCell.classList.add("error");
-        mistakes++;
-        updateMistakesDisplay();
-
-        if ("vibrate" in navigator) {
-            navigator.vibrate(200);
-        }
-
-        if (mistakes >= 3) {
-            clearInterval(timerInterval);
-            showLoseModal();
-        }
-    } else {
-        selectedCell.classList.remove("error");
-        checkWinCondition();
-    }
+function updateTimerDisplay() {
+  const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+  const secs = String(secondsElapsed % 60).padStart(2, '0');
+  timerEl.textContent = `${mins}:${secs}`;
 }
 
 function updateMistakesDisplay() {
-    const display = document.getElementById("mistakes-display");
-    display.innerText = `Mistakes: ${mistakes}/3`;
+  mistakesEl.textContent = `${mistakes}/${MAX_MISTAKES}`;
+}
+
+// Board Generator Logic
+function generateSudoku() {
+  solution = Array(9).fill().map(() => Array(9).fill(0));
+  solveSudoku(solution);
+  
+  initialBoard = solution.map(row => [...row]);
+
+  const diff = difficultyEl.value;
+  let removeCount = diff === 'easy' ? 35 : diff === 'medium' ? 45 : 54;
+
+  while (removeCount > 0) {
+    const r = Math.floor(Math.random() * 9);
+    const c = Math.floor(Math.random() * 9);
+    if (initialBoard[r][c] !== 0) {
+      initialBoard[r][c] = 0;
+      removeCount--;
+    }
+  }
+
+  currentBoard = initialBoard.map(row => [...row]);
+}
+
+function solveSudoku(board) {
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (board[r][c] === 0) {
+        const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        for (let num of nums) {
+          if (isValidPlacement(board, r, c, num)) {
+            board[r][c] = num;
+            if (solveSudoku(board)) return true;
+            board[r][c] = 0;
+          }
+        }
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function isValidPlacement(board, r, c, num) {
+  for (let i = 0; i < 9; i++) {
+    if (board[r][i] === num || board[i][c] === num) return false;
+    const boxR = 3 * Math.floor(r / 3) + Math.floor(i / 3);
+    const boxC = 3 * Math.floor(c / 3) + (i % 3);
+    if (board[boxR][boxC] === num) return false;
+  }
+  return true;
+}
+
+function shuffle(array) {
+  return array.sort(() => Math.random() - 0.5);
+}
+
+// UI Rendering
+function renderBoard() {
+  boardEl.innerHTML = '';
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cell = document.createElement('div');
+      cell.classList.add('cell');
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+
+      const val = currentBoard[r][c];
+      if (val !== 0) {
+        cell.textContent = val;
+        if (initialBoard[r][c] !== 0) {
+          cell.classList.add('given');
+        } else {
+          cell.classList.add('user-input');
+          if (val !== solution[r][c]) {
+            cell.classList.add('error');
+          }
+        }
+      }
+
+      cell.addEventListener('click', () => selectCell(r, c));
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+function selectCell(r, c) {
+  selectedCell = { r, c };
+  const cells = document.querySelectorAll('.cell');
+  const selectedVal = currentBoard[r][c];
+
+  cells.forEach(cell => {
+    const cr = parseInt(cell.dataset.row);
+    const cc = parseInt(cell.dataset.col);
+
+    cell.classList.remove('selected', 'highlight');
+
+    if (cr === r && cc === c) {
+      cell.classList.add('selected');
+    } else if (
+      cr === r || 
+      cc === c || 
+      (Math.floor(cr / 3) === Math.floor(r / 3) && Math.floor(cc / 3) === Math.floor(c / 3)) ||
+      (selectedVal !== 0 && currentBoard[cr][cc] === selectedVal)
+    ) {
+      cell.classList.add('highlight');
+    }
+  });
+}
+
+function buildKeypad() {
+  keypadEl.innerHTML = '';
+  for (let i = 1; i <= 9; i++) {
+    const key = document.createElement('button');
+    key.classList.add('key');
+    key.textContent = i;
+    key.addEventListener('click', () => handleInput(i));
+    keypadEl.appendChild(key);
+  }
+}
+
+function handleInput(num) {
+  if (!selectedCell) return;
+  const { r, c } = selectedCell;
+
+  if (initialBoard[r][c] !== 0) return;
+
+  if (currentBoard[r][c] !== num) {
+    historyStack.push({ r, c, prevVal: currentBoard[r][c] });
+    currentBoard[r][c] = num;
+
+    // Mistake Checking Logic
+    if (num !== solution[r][c]) {
+      mistakes++;
+      updateMistakesDisplay();
+      if (mistakes >= MAX_MISTAKES) {
+        endGame(false);
+        return;
+      }
+    }
+
+    renderBoard();
+    selectCell(r, c);
+    checkWinCondition();
+  }
+}
+
+function eraseInput() {
+  if (!selectedCell) return;
+  const { r, c } = selectedCell;
+  if (initialBoard[r][c] !== 0) return;
+
+  if (currentBoard[r][c] !== 0) {
+    historyStack.push({ r, c, prevVal: currentBoard[r][c] });
+    currentBoard[r][c] = 0;
+    renderBoard();
+    selectCell(r, c);
+  }
+}
+
+function undoMove() {
+  if (historyStack.length === 0) return;
+  const lastMove = historyStack.pop();
+  currentBoard[lastMove.r][lastMove.c] = lastMove.prevVal;
+  renderBoard();
+  selectCell(lastMove.r, lastMove.c);
+}
+
+function giveHint() {
+  if (!selectedCell) return;
+  const { r, c } = selectedCell;
+  if (initialBoard[r][c] !== 0 || currentBoard[r][c] === solution[r][c]) return;
+
+  historyStack.push({ r, c, prevVal: currentBoard[r][c] });
+  currentBoard[r][c] = solution[r][c];
+  renderBoard();
+  selectCell(r, c);
+  checkWinCondition();
 }
 
 function checkWinCondition() {
-    const cells = document.querySelectorAll(".cell");
-    let isComplete = true;
-    let hasError = false;
-
-    cells.forEach(cell => {
-        const row = parseInt(cell.dataset.row);
-        const col = parseInt(cell.dataset.col);
-        const cellValue = parseInt(cell.innerText);
-
-        if (cell.innerText === "") {
-            isComplete = false;
-        } else if (cellValue !== currentPuzzle.solved[row][col]) {
-            hasError = true;
-        }
-    });
-
-    if (isComplete && !hasError) {
-        clearInterval(timerInterval);
-        showWinModal();
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (currentBoard[r][c] !== solution[r][c]) return;
     }
+  }
+  endGame(true);
 }
 
-function showWinModal() {
-    const modal = document.getElementById("win-modal");
-    const winTimeText = document.getElementById("win-time-text");
-    const timerText = document.getElementById("timer").innerText.replace("Time: ", "");
+function endGame(isWin) {
+  clearInterval(timerInterval);
+  stats.played++;
 
-    winTimeText.innerText = `You solved it in ${timerText}!`;
-    modal.classList.remove("hidden");
-}
-
-function showLoseModal() {
-    const modal = document.getElementById("lose-modal");
-    modal.classList.remove("hidden");
-}
-
-function startTimer() {
-    if (timerInterval) clearInterval(timerInterval);
-
-    secondsElapsed = 0;
-    const timerDisplay = document.getElementById("timer");
-    timerDisplay.innerText = "Time: 00:00";
-
-    timerInterval = setInterval(() => {
-        secondsElapsed++;
-        const minutes = Math.floor(secondsElapsed / 60);
-        const seconds = secondsElapsed % 60;
-
-        const formattedMin = String(minutes).padStart(2, "0");
-        const formattedSec = String(seconds).padStart(2, "0");
-
-        timerDisplay.innerText = `Time: ${formattedMin}:${formattedSec}`;
-    }, 1000);
-}
-
-// Single unified startNewGame function
-function startNewGame() {
-    document.getElementById("win-modal").classList.add("hidden");
-    document.getElementById("lose-modal").classList.add("hidden");
-
-    mistakes = 0;
-    updateMistakesDisplay();
-
-    const difficultySelect = document.getElementById('difficulty');
-    const chosenDifficulty = difficultySelect ? difficultySelect.value : 'medium';
-
-    createBoard(chosenDifficulty);
-    startTimer();
-}
-
-function toggleDarkMode() {
-    const body = document.body;
-    const themeBtn = document.getElementById("theme-toggle-btn");
-
-    body.classList.toggle("dark-mode");
-
-    if (body.classList.contains("dark-mode")) {
-        themeBtn.innerText = "☀️";
-    } else {
-        themeBtn.innerText = "🌙";
+  if (isWin) {
+    stats.won++;
+    if (!stats.bestTime || secondsElapsed < stats.bestTime) {
+      stats.bestTime = secondsElapsed;
     }
+    showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl.textContent}!`);
+  } else {
+    stats.losses++;
+    showEndModal("❌ Game Over", "You reached 3 mistakes and lost the game.");
+  }
+
+  localStorage.setItem('sudoku_stats', JSON.stringify(stats));
 }
 
-// Event listener for the New Game button
-const newGameBtn = document.getElementById('new-game-btn');
-if (newGameBtn) {
-    newGameBtn.addEventListener('click', () => {
-        startNewGame();
-    });
+function showEndModal(title, message) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-message').textContent = message;
+  gameModal.classList.add('active');
 }
 
-// Start the game automatically when page loads
-document.addEventListener("DOMContentLoaded", () => {
+function openStatsModal() {
+  document.getElementById('stat-played').textContent = stats.played;
+  document.getElementById('stat-won').textContent = stats.won;
+  
+  const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
+  document.getElementById('stat-winrate').textContent = `${winRate}%`;
+
+  if (stats.bestTime) {
+    const mins = String(Math.floor(stats.bestTime / 60)).padStart(2, '0');
+    const secs = String(stats.bestTime % 60).padStart(2, '0');
+    document.getElementById('stat-besttime').textContent = `${mins}:${secs}`;
+  } else {
+    document.getElementById('stat-besttime').textContent = '--:--';
+  }
+
+  statsModal.classList.add('active');
+}
+
+function setupEventListeners() {
+  document.getElementById('btn-new').addEventListener('click', startNewGame);
+  document.getElementById('btn-erase').addEventListener('click', eraseInput);
+  document.getElementById('btn-undo').addEventListener('click', undoMove);
+  document.getElementById('btn-hint').addEventListener('click', giveHint);
+  document.getElementById('btn-stats').addEventListener('click', openStatsModal);
+  difficultyEl.addEventListener('change', startNewGame);
+
+  // Close Modals
+  document.getElementById('modal-close-btn').addEventListener('click', () => {
+    gameModal.classList.remove('active');
     startNewGame();
-});
+  });
+
+  document.getElementById('stats-close-btn').addEventListener('click', () => {
+    statsModal.classList.remove('active');
+  });
+
+  // Keyboard Controls
+  document.addEventListener('keydown', (e) => {
+    if (!selectedCell) return;
+    if (e.key >= '1' && e.key <= '9') {
+      handleInput(parseInt(e.key));
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+      eraseInput();
+    } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      let { r, c } = selectedCell;
+      if (e.key === 'ArrowUp') r = (r - 1 + 9) % 9;
+      if (e.key === 'ArrowDown') r = (r + 1) % 9;
+      if (e.key === 'ArrowLeft') c = (c - 1 + 9) % 9;
+      if (e.key === 'ArrowRight') c = (c + 1) % 9;
+      selectCell(r, c);
+    }
+  });
+
+  // Dark/Light Theme Switch
+  themeToggle.addEventListener('click', () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      document.body.removeAttribute('data-theme');
+      themeToggle.textContent = '🌙 Dark';
+    } else {
+      document.body.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '☀️ Light';
+    }
+  });
+  }
+   
