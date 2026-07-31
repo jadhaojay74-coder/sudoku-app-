@@ -7,6 +7,7 @@ let selectedCell = null;
 let timerInterval = null;
 let secondsElapsed = 0;
 let mistakes = 0;
+let isPaused = false;
 const MAX_MISTAKES = 3;
 
 // Lifetime Statistics
@@ -24,6 +25,8 @@ const timerEl = document.getElementById('timer');
 const mistakesEl = document.getElementById('mistakes-count');
 const difficultyEl = document.getElementById('difficulty');
 const themeToggle = document.getElementById('theme-toggle');
+const btnPause = document.getElementById('btn-pause');
+const pauseOverlay = document.getElementById('pause-overlay');
 
 // Modals
 const gameModal = document.getElementById('game-modal');
@@ -39,18 +42,40 @@ function startNewGame() {
   clearInterval(timerInterval);
   secondsElapsed = 0;
   mistakes = 0;
+  isPaused = false;
+
+  btnPause.textContent = "Pause";
+  boardEl.classList.remove('paused');
+  pauseOverlay.classList.remove('active');
+
   updateMistakesDisplay();
   updateTimerDisplay();
 
   timerInterval = setInterval(() => {
-    secondsElapsed++;
-    updateTimerDisplay();
+    if (!isPaused) {
+      secondsElapsed++;
+      updateTimerDisplay();
+    }
   }, 1000);
 
   generateSudoku();
   historyStack = [];
   selectedCell = null;
   renderBoard();
+}
+
+function togglePause() {
+  isPaused = !isPaused;
+
+  if (isPaused) {
+    btnPause.textContent = "Resume";
+    boardEl.classList.add('paused');
+    pauseOverlay.classList.add('active');
+  } else {
+    btnPause.textContent = "Pause";
+    boardEl.classList.remove('paused');
+    pauseOverlay.classList.remove('active');
+  }
 }
 
 function updateTimerDisplay() {
@@ -63,7 +88,6 @@ function updateMistakesDisplay() {
   mistakesEl.textContent = `${mistakes}/${MAX_MISTAKES}`;
 }
 
-// Fisher-Yates Shuffle
 function shuffle(array) {
   let arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -73,7 +97,7 @@ function shuffle(array) {
   return arr;
 }
 
-// Fast & Crash-Proof Board Generator
+// Fast & Crash-Proof Generator
 function generateSudoku() {
   const base = [
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -87,21 +111,18 @@ function generateSudoku() {
     [9, 7, 8, 3, 1, 2, 6, 4, 5]
   ];
 
-  // Randomize Digits
   const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   const map = {};
   for (let i = 1; i <= 9; i++) map[i] = nums[i - 1];
 
   solution = base.map(row => row.map(val => map[val]));
 
-  // Shuffle Rows within 3x3 Blocks
   for (let b = 0; b < 3; b++) {
     const r = shuffle([0, 1, 2]);
     const sub = r.map(idx => solution[b * 3 + idx]);
     for (let i = 0; i < 3; i++) solution[b * 3 + i] = sub[i];
   }
 
-  // Shuffle Columns within 3x3 Blocks
   for (let b = 0; b < 3; b++) {
     const c = shuffle([0, 1, 2]);
     for (let r = 0; r < 9; r++) {
@@ -110,7 +131,6 @@ function generateSudoku() {
     }
   }
 
-  // Remove numbers based on difficulty
   initialBoard = solution.map(row => [...row]);
   const diff = difficultyEl.value;
   let removeCount = diff === 'easy' ? 35 : diff === 'medium' ? 45 : 54;
@@ -127,7 +147,6 @@ function generateSudoku() {
   currentBoard = initialBoard.map(row => [...row]);
 }
 
-// UI Rendering
 function renderBoard() {
   boardEl.innerHTML = '';
   for (let r = 0; r < 9; r++) {
@@ -150,7 +169,9 @@ function renderBoard() {
         }
       }
 
-      cell.addEventListener('click', () => selectCell(r, c));
+      cell.addEventListener('click', () => {
+        if (!isPaused) selectCell(r, c);
+      });
       boardEl.appendChild(cell);
     }
   }
@@ -192,7 +213,7 @@ function buildKeypad() {
 }
 
 function handleInput(num) {
-  if (!selectedCell) return;
+  if (isPaused || !selectedCell) return;
   const { r, c } = selectedCell;
 
   if (initialBoard[r][c] !== 0) return;
@@ -217,7 +238,7 @@ function handleInput(num) {
 }
 
 function eraseInput() {
-  if (!selectedCell) return;
+  if (isPaused || !selectedCell) return;
   const { r, c } = selectedCell;
   if (initialBoard[r][c] !== 0) return;
 
@@ -230,7 +251,7 @@ function eraseInput() {
 }
 
 function undoMove() {
-  if (historyStack.length === 0) return;
+  if (isPaused || historyStack.length === 0) return;
   const lastMove = historyStack.pop();
   currentBoard[lastMove.r][lastMove.c] = lastMove.prevVal;
   renderBoard();
@@ -238,7 +259,7 @@ function undoMove() {
 }
 
 function giveHint() {
-  if (!selectedCell) return;
+  if (isPaused || !selectedCell) return;
   const { r, c } = selectedCell;
   if (initialBoard[r][c] !== 0 || currentBoard[r][c] === solution[r][c]) return;
 
@@ -301,6 +322,7 @@ function openStatsModal() {
 }
 
 function setupEventListeners() {
+  btnPause.addEventListener('click', togglePause);
   document.getElementById('btn-new').addEventListener('click', startNewGame);
   document.getElementById('btn-erase').addEventListener('click', eraseInput);
   document.getElementById('btn-undo').addEventListener('click', undoMove);
@@ -308,7 +330,6 @@ function setupEventListeners() {
   document.getElementById('btn-stats').addEventListener('click', openStatsModal);
   difficultyEl.addEventListener('change', startNewGame);
 
-  // Modals
   document.getElementById('modal-close-btn').addEventListener('click', () => {
     gameModal.classList.remove('active');
     startNewGame();
@@ -318,9 +339,8 @@ function setupEventListeners() {
     statsModal.classList.remove('active');
   });
 
-  // Physical Keyboard Input
   document.addEventListener('keydown', (e) => {
-    if (!selectedCell) return;
+    if (isPaused || !selectedCell) return;
     if (e.key >= '1' && e.key <= '9') {
       handleInput(parseInt(e.key));
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -335,7 +355,6 @@ function setupEventListeners() {
     }
   });
 
-  // Theme Switcher
   themeToggle.addEventListener('click', () => {
     const isDark = document.body.getAttribute('data-theme') === 'dark';
     if (isDark) {
@@ -346,4 +365,4 @@ function setupEventListeners() {
       themeToggle.textContent = '☀️ Light';
     }
   });
-       }
+}
