@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sudoku Master</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -33,14 +33,18 @@
     </div>
   </div>
 
-  <div class="board" id="board"></div>
+  <div class="board-wrapper">
+    <div class="board" id="board"></div>
+    <div class="pause-overlay" id="pause-overlay">PAUSED</div>
+  </div>
 
   <div class="action-buttons">
+    <button class="btn" id="btn-pause">Pause</button>
     <button class="btn" id="btn-undo">Undo</button>
     <button class="btn" id="btn-hint">Hint</button>
     <button class="btn" id="btn-erase">Erase</button>
     <button class="btn btn-secondary" id="btn-stats">Stats</button>
-    <button class="btn btn-secondary" id="btn-new">New Game</button>
+    <button class="btn btn-secondary" id="btn-new">New</button>
   </div>
 
   <div class="keypad" id="keypad"></div>
@@ -50,7 +54,6 @@
   <div class="modal-content">
     <h2 id="modal-title">Game Over</h2>
     <p id="modal-message">You reached 3 mistakes!</p>
-    <div class="stats-summary" id="modal-stats"></div>
     <button class="btn modal-btn" id="modal-close-btn">Play Again</button>
   </div>
 </div>
