@@ -15,6 +15,16 @@
 
     <div id="status-bar">
         <div id="timer">Time: 00:00</div>
+         <div class="difficulty-selector">
+    <label for="difficulty">Select Difficulty:</label>
+    <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+    </select>
+    <button id="new-game-btn">New Game</button>
+</div>
+
         <div id="mistakes-display">Mistakes: 0/3</div>
         <div class="button-group">
             <button id="new-game-btn" onclick="startNewGame()">New Game</button>
