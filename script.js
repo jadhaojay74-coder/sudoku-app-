@@ -1,4 +1,4 @@
-let currentPuzzle = { initial: [], solved: [] };
+ let currentPuzzle = { initial: [], solved: [] };
 let selectedCell = null;
 let activeNumber = null;
 let secondsElapsed = 0;
@@ -8,7 +8,7 @@ let mistakes = 0;
 function isValid(board, row, col, num) {
     for (let i = 0; i < 9; i++) {
         if (board[row][i] === num || board[i][col] === num) return false;
-        
+
         const boxRow = Math.floor(row / 3) * 3 + Math.floor(i / 3);
         const boxCol = Math.floor(col / 3) * 3 + (i % 3);
         if (board[boxRow][boxCol] === num) return false;
@@ -21,7 +21,7 @@ function fillBoard(board) {
         for (let col = 0; col < 9; col++) {
             if (board[row][col] === 0) {
                 const nums = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
-                
+
                 for (let num of nums) {
                     if (isValid(board, row, col, num)) {
                         board[row][col] = num;
@@ -40,26 +40,34 @@ function generatePuzzle(cluesToRemove = 40) {
     const solvedBoard = Array.from({ length: 9 }, () => Array(9).fill(0));
     fillBoard(solvedBoard);
     const initialBoard = solvedBoard.map(row => [...row]);
-    
+
     let removed = 0;
     while (removed < cluesToRemove) {
         const row = Math.floor(Math.random() * 9);
         const col = Math.floor(Math.random() * 9);
-        
+
         if (initialBoard[row][col] !== 0) {
             initialBoard[row][col] = 0;
             removed++;
         }
     }
-    
+
     return {
         initial: initialBoard,
         solved: solvedBoard
     };
 }
 
-function createBoard() {
-    currentPuzzle = generatePuzzle(40);
+function createBoard(difficulty = 'medium') {
+    let cellsToRemove = 40; // default medium
+
+    if (difficulty === 'easy') {
+        cellsToRemove = 30;
+    } else if (difficulty === 'hard') {
+        cellsToRemove = 55;
+    }
+
+    currentPuzzle = generatePuzzle(cellsToRemove);
     const boardContainer = document.getElementById("sudoku-board");
     boardContainer.innerHTML = "";
     selectedCell = null;
@@ -71,10 +79,10 @@ function createBoard() {
             const cellValue = currentPuzzle.initial[row][col];
             const cell = document.createElement("div");
             cell.classList.add("cell");
-            
+
             cell.dataset.row = row;
             cell.dataset.col = col;
-            
+
             if (row === 2 || row === 5) {
                 cell.classList.add(`cell-row-${row}`);
             }
@@ -92,7 +100,7 @@ function createBoard() {
 
 function selectCell(cell) {
     const cells = document.querySelectorAll(".cell");
-    
+
     cells.forEach(c => {
         c.classList.remove("selected", "related");
     });
@@ -202,7 +210,7 @@ function showWinModal() {
     const modal = document.getElementById("win-modal");
     const winTimeText = document.getElementById("win-time-text");
     const timerText = document.getElementById("timer").innerText.replace("Time: ", "");
-    
+
     winTimeText.innerText = `You solved it in ${timerText}!`;
     modal.classList.remove("hidden");
 }
@@ -214,7 +222,7 @@ function showLoseModal() {
 
 function startTimer() {
     if (timerInterval) clearInterval(timerInterval);
-    
+
     secondsElapsed = 0;
     const timerDisplay = document.getElementById("timer");
     timerDisplay.innerText = "Time: 00:00";
@@ -223,31 +231,35 @@ function startTimer() {
         secondsElapsed++;
         const minutes = Math.floor(secondsElapsed / 60);
         const seconds = secondsElapsed % 60;
-        
+
         const formattedMin = String(minutes).padStart(2, "0");
         const formattedSec = String(seconds).padStart(2, "0");
-        
+
         timerDisplay.innerText = `Time: ${formattedMin}:${formattedSec}`;
     }, 1000);
 }
 
+// Single unified startNewGame function
 function startNewGame() {
     document.getElementById("win-modal").classList.add("hidden");
     document.getElementById("lose-modal").classList.add("hidden");
-    
+
     mistakes = 0;
     updateMistakesDisplay();
-    
-    createBoard();
+
+    const difficultySelect = document.getElementById('difficulty');
+    const chosenDifficulty = difficultySelect ? difficultySelect.value : 'medium';
+
+    createBoard(chosenDifficulty);
     startTimer();
 }
 
 function toggleDarkMode() {
     const body = document.body;
     const themeBtn = document.getElementById("theme-toggle-btn");
-    
+
     body.classList.toggle("dark-mode");
-    
+
     if (body.classList.contains("dark-mode")) {
         themeBtn.innerText = "☀️";
     } else {
@@ -255,30 +267,15 @@ function toggleDarkMode() {
     }
 }
 
-// Get the dropdown element
-const difficultySelect = document.getElementById('difficulty');
+// Event listener for the New Game button
 const newGameBtn = document.getElementById('new-game-btn');
-
-newGameBtn.addEventListener('click', () => {
-    const selectedDifficulty = difficultySelect.value;
-    
-    // Call your game generator function and pass the difficulty
-    startNewGame(selectedDifficulty);
-});
-
-function startNewGame(difficulty) {
-    let cellsToRemove = 40; // default medium
-
-    if (difficulty === 'easy') {
-        cellsToRemove = 30;
-    } else if (difficulty === 'hard') {
-        cellsToRemove = 55;
-    }
-
-    console.log(`Starting a ${difficulty} game by removing ${cellsToRemove} cells.`);
-    // TODO: Add your logic here to generate the puzzle and fill the grid
+if (newGameBtn) {
+    newGameBtn.addEventListener('click', () => {
+        startNewGame();
+    });
 }
 
-
-startNewGame();
-              
+// Start the game automatically when page loads
+document.addEventListener("DOMContentLoaded", () => {
+    startNewGame();
+});
