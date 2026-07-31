@@ -9,7 +9,7 @@ let secondsElapsed = 0;
 let mistakes = 0;
 const MAX_MISTAKES = 3;
 
-// Performance Statistics Storage
+// Lifetime Statistics
 let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
   played: 0,
   won: 0,
@@ -63,13 +63,55 @@ function updateMistakesDisplay() {
   mistakesEl.textContent = `${mistakes}/${MAX_MISTAKES}`;
 }
 
-// Board Generator Logic
-function generateSudoku() {
-  solution = Array(9).fill().map(() => Array(9).fill(0));
-  solveSudoku(solution);
-  
-  initialBoard = solution.map(row => [...row]);
+// Fisher-Yates Shuffle
+function shuffle(array) {
+  let arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
+// Fast & Crash-Proof Board Generator
+function generateSudoku() {
+  const base = [
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [4, 5, 6, 7, 8, 9, 1, 2, 3],
+    [7, 8, 9, 1, 2, 3, 4, 5, 6],
+    [2, 3, 1, 5, 6, 4, 8, 9, 7],
+    [5, 6, 4, 8, 9, 7, 2, 3, 1],
+    [8, 9, 7, 2, 3, 1, 5, 6, 4],
+    [3, 1, 2, 6, 4, 5, 9, 7, 8],
+    [6, 4, 5, 9, 7, 8, 3, 1, 2],
+    [9, 7, 8, 3, 1, 2, 6, 4, 5]
+  ];
+
+  // Randomize Digits
+  const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  const map = {};
+  for (let i = 1; i <= 9; i++) map[i] = nums[i - 1];
+
+  solution = base.map(row => row.map(val => map[val]));
+
+  // Shuffle Rows within 3x3 Blocks
+  for (let b = 0; b < 3; b++) {
+    const r = shuffle([0, 1, 2]);
+    const sub = r.map(idx => solution[b * 3 + idx]);
+    for (let i = 0; i < 3; i++) solution[b * 3 + i] = sub[i];
+  }
+
+  // Shuffle Columns within 3x3 Blocks
+  for (let b = 0; b < 3; b++) {
+    const c = shuffle([0, 1, 2]);
+    for (let r = 0; r < 9; r++) {
+      const sub = c.map(idx => solution[r][b * 3 + idx]);
+      for (let i = 0; i < 3; i++) solution[r][b * 3 + i] = sub[i];
+    }
+  }
+
+  // Remove numbers based on difficulty
+  initialBoard = solution.map(row => [...row]);
   const diff = difficultyEl.value;
   let removeCount = diff === 'easy' ? 35 : diff === 'medium' ? 45 : 54;
 
@@ -83,39 +125,6 @@ function generateSudoku() {
   }
 
   currentBoard = initialBoard.map(row => [...row]);
-}
-
-function solveSudoku(board) {
-  for (let r = 0; r < 9; r++) {
-    for (let c = 0; c < 9; c++) {
-      if (board[r][c] === 0) {
-        const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-        for (let num of nums) {
-          if (isValidPlacement(board, r, c, num)) {
-            board[r][c] = num;
-            if (solveSudoku(board)) return true;
-            board[r][c] = 0;
-          }
-        }
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-function isValidPlacement(board, r, c, num) {
-  for (let i = 0; i < 9; i++) {
-    if (board[r][i] === num || board[i][c] === num) return false;
-    const boxR = 3 * Math.floor(r / 3) + Math.floor(i / 3);
-    const boxC = 3 * Math.floor(c / 3) + (i % 3);
-    if (board[boxR][boxC] === num) return false;
-  }
-  return true;
-}
-
-function shuffle(array) {
-  return array.sort(() => Math.random() - 0.5);
 }
 
 // UI Rendering
@@ -192,7 +201,6 @@ function handleInput(num) {
     historyStack.push({ r, c, prevVal: currentBoard[r][c] });
     currentBoard[r][c] = num;
 
-    // Mistake Checking Logic
     if (num !== solution[r][c]) {
       mistakes++;
       updateMistakesDisplay();
@@ -262,7 +270,7 @@ function endGame(isWin) {
     showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl.textContent}!`);
   } else {
     stats.losses++;
-    showEndModal("❌ Game Over", "You reached 3 mistakes and lost the game.");
+    showEndModal("❌ Game Over", "You made 3 mistakes and lost.");
   }
 
   localStorage.setItem('sudoku_stats', JSON.stringify(stats));
@@ -300,7 +308,7 @@ function setupEventListeners() {
   document.getElementById('btn-stats').addEventListener('click', openStatsModal);
   difficultyEl.addEventListener('change', startNewGame);
 
-  // Close Modals
+  // Modals
   document.getElementById('modal-close-btn').addEventListener('click', () => {
     gameModal.classList.remove('active');
     startNewGame();
@@ -310,7 +318,7 @@ function setupEventListeners() {
     statsModal.classList.remove('active');
   });
 
-  // Keyboard Controls
+  // Physical Keyboard Input
   document.addEventListener('keydown', (e) => {
     if (!selectedCell) return;
     if (e.key >= '1' && e.key <= '9') {
@@ -327,7 +335,7 @@ function setupEventListeners() {
     }
   });
 
-  // Dark/Light Theme Switch
+  // Theme Switcher
   themeToggle.addEventListener('click', () => {
     const isDark = document.body.getAttribute('data-theme') === 'dark';
     if (isDark) {
@@ -338,5 +346,4 @@ function setupEventListeners() {
       themeToggle.textContent = '☀️ Light';
     }
   });
-  }
-   
+       }
