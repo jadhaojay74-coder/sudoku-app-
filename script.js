@@ -10,6 +10,10 @@ let mistakes = 0;
 let isPaused = false;
 const MAX_MISTAKES = 3;
 
+// Difficulty Limits
+let hintsRemaining = 3;
+let undosRemaining = 3;
+
 // Lifetime Statistics
 let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
   played: 0,
@@ -26,6 +30,8 @@ const mistakesEl = document.getElementById('mistakes-count');
 const difficultyEl = document.getElementById('difficulty');
 const themeToggle = document.getElementById('theme-toggle');
 const btnPause = document.getElementById('btn-pause');
+const btnUndo = document.getElementById('btn-undo');
+const btnHint = document.getElementById('btn-hint');
 const pauseOverlay = document.getElementById('pause-overlay');
 
 // Modals
@@ -48,6 +54,20 @@ function startNewGame() {
   boardEl.classList.remove('paused');
   pauseOverlay.classList.remove('active');
 
+  // Set limits based on selected difficulty
+  const diff = difficultyEl.value;
+  if (diff === 'easy') {
+    hintsRemaining = 3;
+    undosRemaining = 3;
+  } else if (diff === 'medium') {
+    hintsRemaining = 2;
+    undosRemaining = 2;
+  } else {
+    hintsRemaining = 1;
+    undosRemaining = 1;
+  }
+
+  updateActionButtonLabels();
   updateMistakesDisplay();
   updateTimerDisplay();
 
@@ -62,6 +82,14 @@ function startNewGame() {
   historyStack = [];
   selectedCell = null;
   renderBoard();
+}
+
+function updateActionButtonLabels() {
+  btnUndo.textContent = `Undo (${undosRemaining})`;
+  btnHint.textContent = `Hint (${hintsRemaining})`;
+
+  btnUndo.disabled = undosRemaining <= 0;
+  btnHint.disabled = hintsRemaining <= 0;
 }
 
 function togglePause() {
@@ -97,7 +125,7 @@ function shuffle(array) {
   return arr;
 }
 
-// Fast & Crash-Proof Generator
+// Fast Generator
 function generateSudoku() {
   const base = [
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -251,20 +279,30 @@ function eraseInput() {
 }
 
 function undoMove() {
-  if (isPaused || historyStack.length === 0) return;
+  if (isPaused || historyStack.length === 0 || undosRemaining <= 0) return;
+
   const lastMove = historyStack.pop();
   currentBoard[lastMove.r][lastMove.c] = lastMove.prevVal;
+  
+  undosRemaining--;
+  updateActionButtonLabels();
+
   renderBoard();
   selectCell(lastMove.r, lastMove.c);
 }
 
 function giveHint() {
-  if (isPaused || !selectedCell) return;
+  if (isPaused || !selectedCell || hintsRemaining <= 0) return;
   const { r, c } = selectedCell;
+
   if (initialBoard[r][c] !== 0 || currentBoard[r][c] === solution[r][c]) return;
 
   historyStack.push({ r, c, prevVal: currentBoard[r][c] });
   currentBoard[r][c] = solution[r][c];
+
+  hintsRemaining--;
+  updateActionButtonLabels();
+
   renderBoard();
   selectCell(r, c);
   checkWinCondition();
@@ -325,8 +363,8 @@ function setupEventListeners() {
   btnPause.addEventListener('click', togglePause);
   document.getElementById('btn-new').addEventListener('click', startNewGame);
   document.getElementById('btn-erase').addEventListener('click', eraseInput);
-  document.getElementById('btn-undo').addEventListener('click', undoMove);
-  document.getElementById('btn-hint').addEventListener('click', giveHint);
+  btnUndo.addEventListener('click', undoMove);
+  btnHint.addEventListener('click', giveHint);
   document.getElementById('btn-stats').addEventListener('click', openStatsModal);
   difficultyEl.addEventListener('change', startNewGame);
 
@@ -365,4 +403,5 @@ function setupEventListeners() {
       themeToggle.textContent = '☀️ Light';
     }
   });
-}
+    }
+    
