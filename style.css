@@ -1,182 +1,251 @@
-/* General App Styling */
+:root {
+  --bg-color: #f4f6f9;
+  --card-bg: #ffffff;
+  --text-color: #2c3e50;
+  --grid-border: #34495e;
+  --cell-border: #dcdde1;
+  --selected-bg: #d6e4ff;
+  --highlight-bg: #edf2ff;
+  --error-color: #e74c3c;
+  --primary-color: #3498db;
+  --primary-hover: #2980b9;
+  --given-color: #2c3e50;
+  --input-color: #0984e3;
+  --modal-bg: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] {
+  --bg-color: #1a1a2e;
+  --card-bg: #16213e;
+  --text-color: #e1e1e1;
+  --grid-border: #4f5b66;
+  --cell-border: #2e384d;
+  --selected-bg: #0f3460;
+  --highlight-bg: #1f4068;
+  --error-color: #e74c3c;
+  --primary-color: #e94560;
+  --primary-hover: #c0392b;
+  --given-color: #ffffff;
+  --input-color: #4cd137;
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f4f4f9;
-    color: #333;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transition: background-color 0.3s, color 0.3s;
+  margin: 0;
+  padding: 20px 10px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  transition: background-color 0.3s, color 0.3s;
 }
+
+.container {
+  background: var(--card-bg);
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 h1 {
-    margin-bottom: 10px;
+  margin: 0;
+  font-size: 1.6rem;
 }
 
-/* Controls Header (Timer, Mistakes, Difficulty) */
-.game-controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
+.theme-btn {
+  background: none;
+  border: 2px solid var(--text-color);
+  color: var(--text-color);
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
 }
 
-select, button {
-    padding: 8px 12px;
-    font-size: 16px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    background-color: #fff;
-    cursor: pointer;
+.status-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  background: var(--bg-color);
+  padding: 10px 14px;
+  border-radius: 10px;
 }
 
-button {
-    background-color: #2ecc71;
-    color: white;
-    border: none;
-    font-weight: bold;
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
 }
 
-button:hover {
-    background-color: #27ae60;
+.mistake-text {
+  color: var(--error-color);
 }
 
-/* Sudoku Board Grid */
-#sudoku-board {
-    display: grid;
-    grid-template-columns: repeat(9, 40px);
-    grid-template-rows: repeat(9, 40px);
-    gap: 1px;
-    background-color: #333;
-    border: 3px solid #333;
-    margin-bottom: 20px;
+select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--cell-border);
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  width: 100%;
+  aspect-ratio: 1;
+  border: 3px solid var(--grid-border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
 }
 
 .cell {
-    background-color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 20px;
-    font-weight: bold;
-    cursor: pointer;
-    user-select: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+  border: 1px solid var(--cell-border);
+  background-color: var(--card-bg);
+  cursor: pointer;
+  transition: background-color 0.15s;
 }
 
-/* Thick borders for 3x3 subgrids */
-.cell-row-2, .cell-row-5 {
-    border-bottom: 3px solid #333;
+.cell:nth-child(3n) { border-right: 2px solid var(--grid-border); }
+.cell:nth-child(9n) { border-right: none; }
+.cell:nth-child(n+19):nth-child(-n+27),
+.cell:nth-child(n+46):nth-child(-n+54) {
+  border-bottom: 2px solid var(--grid-border);
 }
 
-.cell[data-col="2"], .cell[data-col="5"] {
-    border-right: 3px solid #333;
+.cell.given { color: var(--given-color); font-weight: 700; }
+.cell.user-input { color: var(--input-color); }
+.cell.highlight { background-color: var(--highlight-bg); }
+.cell.selected { background-color: var(--selected-bg) !important; }
+.cell.error { color: var(--error-color) !important; background-color: rgba(231, 76, 60, 0.15); }
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 16px;
 }
 
-/* Cell States */
-.cell.prefilled {
-    color: #2c3e50;
-    background-color: #f8f9fa;
+.btn {
+  padding: 10px 4px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--primary-color);
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
-.cell.user-input {
-    color: #2980b9;
-}
+.btn:active { transform: scale(0.97); }
+.btn-secondary { background-color: #7f8c8d; }
 
-.cell.selected {
-    background-color: #d4e6f1 !important;
-}
-
-.cell.related {
-    background-color: #ebf5fb;
-}
-
-.cell.error {
-    color: #e74c3c;
-    background-color: #fadbd8;
-}
-
-/* Number Keypad */
 .keypad {
-    display: grid;
-    grid-template-columns: repeat(5, 50px);
-    gap: 8px;
-    justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 6px;
+  width: 100%;
 }
 
-.num-btn {
-    height: 50px;
-    font-size: 20px;
-    background-color: #e0e0e0;
-    color: #333;
-    border: none;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
+.key {
+  aspect-ratio: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--card-bg);
+  border: 1px solid var(--cell-border);
+  color: var(--text-color);
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.num-btn:hover {
-    background-color: #d0d0d0;
+/* Modals */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-color: var(--modal-bg);
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
 }
 
-.num-btn.active-num {
-    background-color: #3498db;
-    color: white;
+.modal-overlay.active {
+  display: flex;
 }
 
-/* Dark Mode Styles */
-body.dark-mode {
-    background-color: #121212;
-    color: #e0e0e0;
+.modal-content {
+  background: var(--card-bg);
+  padding: 24px;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
 }
 
-body.dark-mode select, 
-body.dark-mode button {
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-    border-color: #444;
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 20px 0;
 }
 
-body.dark-mode #sudoku-board {
-    background-color: #555;
-    border-color: #555;
+.stat-card {
+  background: var(--bg-color);
+  padding: 12px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
 }
 
-body.dark-mode .cell {
-    background-color: #1e1e1e;
-    color: #e0e0e0;
+.stat-number {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: var(--primary-color);
 }
 
-body.dark-mode .cell.prefilled {
-    background-color: #252525;
-    color: #bdc3c7;
+.stat-label {
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
-body.dark-mode .cell.selected {
-    background-color: #1f4068 !important;
-}
-
-body.dark-mode .cell.related {
-    background-color: #162447;
-}
-
-body.dark-mode .cell.error {
-    background-color: #512b2b;
-    color: #ff6b6b;
-}
-
-body.dark-mode .num-btn {
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-}
-
-body.dark-mode .num-btn:hover {
-    background-color: #3d3d3d;
-}
-
-/* Modals for Win/Lose */
-.hidden {
-    display: none;
+.modal-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
 }
