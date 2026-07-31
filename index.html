@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Sudoku</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Sudoku</h1>
+        <button id="theme-toggle-btn" onclick="toggleDarkMode()">🌙</button>
+    </header>
+
+    <div id="status-bar">
+        <div id="timer">Time: 00:00</div>
+        <div id="mistakes-display">Mistakes: 0/3</div>
+        <div class="button-group">
+            <button id="new-game-btn" onclick="startNewGame()">New Game</button>
+        </div>
+    </div>
+
+    <div id="sudoku-board"></div>
+
+    <div id="numpad">
+        <button class="num-btn" onclick="selectInputNumber(1)">1</button>
+        <button class="num-btn" onclick="selectInputNumber(2)">2</button>
+        <button class="num-btn" onclick="selectInputNumber(3)">3</button>
+        <button class="num-btn" onclick="selectInputNumber(4)">4</button>
+        <button class="num-btn" onclick="selectInputNumber(5)">5</button>
+        <button class="num-btn" onclick="selectInputNumber(6)">6</button>
+        <button class="num-btn" onclick="selectInputNumber(7)">7</button>
+        <button class="num-btn" onclick="selectInputNumber(8)">8</button>
+        <button class="num-btn" onclick="selectInputNumber(9)">9</button>
+        <button class="num-btn clear-btn" onclick="selectInputNumber('')">CL</button>
+    </div>
+
+    <div id="win-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>🎉 Puzzle Solved! 🎉</h2>
+            <p id="win-time-text">You solved it in 00:00!</p>
+            <button id="play-again-btn" onclick="startNewGame()">Play Again</button>
+        </div>
+    </div>
+
+    <div id="lose-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 style="color: #d9534f;">❌ Game Over ❌</h2>
+            <p>You made 3 mistakes!</p>
+            <button id="try-again-btn" onclick="startNewGame()">Try Again</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

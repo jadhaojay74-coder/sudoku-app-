@@ -1,0 +1,338 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #f4f4f9;
+    padding: 10px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 90vw;
+    max-width: 420px;
+    margin-bottom: 10px;
+}
+
+h1 {
+    color: #333;
+    font-size: 1.5rem;
+}
+
+#theme-toggle-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 5px;
+}
+
+#status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 90vw;
+    max-width: 420px;
+    margin-bottom: 15px;
+}
+
+#timer {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #444;
+}
+
+#mistakes-display {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #d9534f;
+}
+
+.button-group {
+    display: flex;
+    gap: 8px;
+}
+
+#new-game-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    background-color: #4CAF50;
+}
+
+#new-game-btn:active {
+    background-color: #388E3C;
+}
+
+#sudoku-board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    width: 92vw;
+    max-width: 420px;
+    height: 92vw;
+    max-height: 420px;
+    border: 3px solid #000;
+    background-color: #fff;
+}
+
+.cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    user-select: none;
+}
+
+.cell:nth-child(3n) {
+    border-right: 2px solid #000;
+}
+.cell:nth-child(9n) {
+    border-right: none;
+}
+.cell-row-2, .cell-row-5 {
+    border-bottom: 2px solid #000;
+}
+
+.cell.related {
+    background-color: #e2ebf3;
+}
+
+.cell.selected {
+    background-color: #bbd8f8 !important;
+}
+
+.cell.prefilled {
+    background-color: #eaeaea;
+    color: #333;
+}
+.cell.user-input {
+    color: #0066cc;
+}
+
+.cell.error {
+    background-color: #ffd6d6 !important;
+    color: #d9534f !important;
+}
+
+#numpad {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    width: 92vw;
+    max-width: 420px;
+    margin-top: 15px;
+}
+
+.num-btn {
+    padding: 12px 0;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    background-color: #333;
+    color: #fff;
+    cursor: pointer;
+}
+
+.num-btn:active {
+    background-color: #555;
+}
+
+.num-btn.active-num {
+    background-color: #008cba !important;
+    transform: scale(0.95);
+}
+
+.clear-btn {
+    background-color: #d9534f;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 25px 30px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    width: 85vw;
+    max-width: 300px;
+}
+
+.modal-content h2 {
+    color: #4CAF50;
+    margin-bottom: 10px;
+}
+
+.modal-content p {
+    font-size: 1.1rem;
+    color: #444;
+    margin-bottom: 20px;
+}
+
+#play-again-btn, #try-again-btn {
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    width: 100%;
+}
+
+#play-again-btn {
+    background-color: #4CAF50;
+}
+#play-again-btn:active {
+    background-color: #388E3C;
+}
+
+#try-again-btn {
+    background-color: #d9534f;
+}
+#try-again-btn:active {
+    background-color: #b52b27;
+}
+
+/* MEDIA QUERIES FOR DIFFERENT DEVICES */
+@media screen and (max-width: 359px) {
+    #sudoku-board, #numpad, header, #status-bar {
+        max-width: 290px;
+    }
+    .cell {
+        font-size: 1rem;
+    }
+    .num-btn {
+        padding: 10px 0;
+        font-size: 1rem;
+    }
+}
+
+@media screen and (min-width: 600px) {
+    #sudoku-board {
+        max-width: 450px;
+        max-height: 450px;
+        border-width: 4px;
+    }
+    #numpad, header, #status-bar {
+        max-width: 450px;
+    }
+    .cell {
+        font-size: 1.5rem;
+    }
+    .num-btn {
+        padding: 18px 0;
+        font-size: 1.4rem;
+    }
+    h1 {
+        font-size: 2rem;
+    }
+}
+
+/* DARK MODE THEME */
+body.dark-mode {
+    background-color: #121212;
+}
+
+body.dark-mode h1,
+body.dark-mode #timer {
+    color: #e0e0e0;
+}
+
+body.dark-mode #sudoku-board {
+    background-color: #1e1e1e;
+    border-color: #888;
+}
+
+body.dark-mode .cell {
+    border-color: #333;
+    color: #e0e0e0;
+}
+
+body.dark-mode .cell:nth-child(3n) {
+    border-right: 2px solid #888;
+}
+body.dark-mode .cell:nth-child(9n) {
+    border-right: none;
+}
+body.dark-mode .cell-row-2,
+body.dark-mode .cell-row-5 {
+    border-bottom: 2px solid #888;
+}
+
+body.dark-mode .cell.prefilled {
+    background-color: #2a2a2a;
+    color: #bbb;
+}
+
+body.dark-mode .cell.related {
+    background-color: #283443;
+}
+
+body.dark-mode .cell.selected {
+    background-color: #1a4d80 !important;
+}
+
+body.dark-mode .cell.user-input {
+    color: #64b5f6;
+}
+
+body.dark-mode .num-btn {
+    background-color: #2c2c2c;
+    color: #e0e0e0;
+}
+
+body.dark-mode .num-btn:active {
+    background-color: #444;
+}
+
+body.dark-mode .num-btn.active-num {
+    background-color: #1e88e5 !important;
+}
+
+body.dark-mode .clear-btn {
+    background-color: #b71c1c;
+}
+
+body.dark-mode .modal-content {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+}
+
+body.dark-mode .modal-content p {
+    color: #bbb;
+}
