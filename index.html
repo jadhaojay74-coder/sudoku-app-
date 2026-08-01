@@ -35,6 +35,8 @@
     </div>
   </div>
 
+  <div class="game-mode-banner" id="game-mode-banner">Standard Game</div>
+
   <div class="board-wrapper">
     <div class="board" id="board"></div>
     <div class="pause-overlay" id="pause-overlay">PAUSED</div>
@@ -46,13 +48,37 @@
     <button class="btn" id="btn-undo">Undo (2)</button>
     <button class="btn" id="btn-hint">Hint (2)</button>
     <button class="btn" id="btn-erase">Erase</button>
-    <button class="btn btn-secondary" id="btn-daily">Daily</button>
-    <button class="btn btn-secondary" id="btn-print">Print</button>
+    <button class="btn btn-secondary" id="btn-daily">Calendar</button>
+    <button class="btn btn-secondary" id="btn-rewards">Rewards</button>
     <button class="btn btn-secondary" id="btn-stats">Stats</button>
     <button class="btn btn-secondary" id="btn-new">New</button>
   </div>
 
   <div class="keypad" id="keypad"></div>
+</div>
+
+<div class="modal-overlay" id="calendar-modal">
+  <div class="modal-content calendar-modal-content">
+    <div class="calendar-header">
+      <button class="btn btn-secondary" id="cal-prev-month">&lt;</button>
+      <h3 id="calendar-month-title">August 2026</h3>
+      <button class="btn btn-secondary" id="cal-next-month">&gt;</button>
+    </div>
+    <div class="calendar-weekdays">
+      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+    </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+    <button class="btn modal-btn" id="calendar-close-btn">Close</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rewards-modal">
+  <div class="modal-content">
+    <h2>🏆 Trophy Room</h2>
+    <p class="rewards-subtitle">Complete all daily challenges in a month to earn a trophy!</p>
+    <div class="trophy-grid" id="trophy-grid"></div>
+    <button class="btn modal-btn" id="rewards-close-btn">Close</button>
+  </div>
 </div>
 
 <div class="modal-overlay" id="game-modal">
@@ -90,4 +116,5 @@
 
 <script src="script.js"></script>
 </body>
-</html>
+  </html>
+  
