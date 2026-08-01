@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sudoku Master</title>
+  <title>Sudoku Master Pro</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+
+<canvas id="confetti-canvas"></canvas>
 
 <div class="container">
   <header>
@@ -16,7 +18,7 @@
 
   <div class="status-bar">
     <div class="status-item">
-      <span>Difficulty:</span>
+      <span>Mode:</span>
       <select id="difficulty">
         <option value="easy">Easy</option>
         <option value="medium" selected>Medium</option>
@@ -40,9 +42,12 @@
 
   <div class="action-buttons">
     <button class="btn" id="btn-pause">Pause</button>
-    <button class="btn" id="btn-undo">Undo</button>
-    <button class="btn" id="btn-hint">Hint</button>
+    <button class="btn" id="btn-notes">Notes (OFF)</button>
+    <button class="btn" id="btn-undo">Undo (2)</button>
+    <button class="btn" id="btn-hint">Hint (2)</button>
     <button class="btn" id="btn-erase">Erase</button>
+    <button class="btn btn-secondary" id="btn-daily">Daily</button>
+    <button class="btn btn-secondary" id="btn-print">Print</button>
     <button class="btn btn-secondary" id="btn-stats">Stats</button>
     <button class="btn btn-secondary" id="btn-new">New</button>
   </div>
