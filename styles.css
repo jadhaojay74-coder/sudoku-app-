@@ -78,6 +78,22 @@ header {
 
 h1 { margin: 0; font-size: 1.5rem; }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.streak-badge {
+  font-size: 0.85rem;
+  font-weight: bold;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid #f59e0b;
+}
+
 .theme-btn {
   background: none;
   border: 2px solid var(--text-color);
@@ -176,7 +192,7 @@ select {
   border: 1px solid var(--cell-border);
   background-color: var(--card-bg);
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color 0.15s, transform 0.2s;
 }
 
 .cell:nth-child(3n) { border-right: 2px solid var(--grid-border); }
@@ -194,6 +210,16 @@ select {
   color: var(--selected-text) !important;
 }
 .cell.error { color: var(--error-color) !important; background-color: rgba(239, 68, 68, 0.25); }
+
+.cell.flash-complete {
+  animation: pulse-success 0.6s ease-in-out;
+}
+
+@keyframes pulse-success {
+  0% { background-color: var(--card-bg); }
+  50% { background-color: rgba(16, 185, 129, 0.4); transform: scale(1.05); }
+  100% { background-color: var(--card-bg); }
+}
 
 .notes-grid {
   display: grid;
@@ -246,22 +272,31 @@ select {
 }
 
 .key {
+  position: relative;
   min-height: 48px;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   background-color: var(--card-bg);
   border: 2px solid var(--primary-color);
   color: var(--text-color);
-  font-size: 1.3rem;
-  font-weight: bold;
   border-radius: 8px;
   cursor: pointer;
   box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-  transition: background-color 0.15s, transform 0.1s;
+  transition: background-color 0.15s, transform 0.1s, opacity 0.2s;
 }
 
-.key:active {
+.key-digit { font-size: 1.1rem; font-weight: bold; }
+.key-badge { font-size: 0.55rem; opacity: 0.7; font-weight: 600; margin-top: -2px; }
+
+.key.key-completed {
+  opacity: 0.35;
+  border-color: var(--cell-border);
+  cursor: default;
+}
+
+.key:active:not(.key-completed) {
   background-color: var(--primary-color);
   color: #ffffff;
   transform: scale(0.92);
@@ -373,4 +408,10 @@ select {
 .stat-number { font-size: 1.3rem; font-weight: bold; color: var(--primary-color); }
 .stat-label { font-size: 0.75rem; opacity: 0.8; }
 .modal-btn { width: 100%; padding: 10px; margin-top: 8px; }
-                    
+
+.modal-action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.modal-action-row .btn { flex: 1; padding: 10px; }
