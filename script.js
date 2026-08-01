@@ -13,83 +13,21 @@ let isNotesMode = false;
 let activeDateStr = null;
 const MAX_MISTAKES = 3;
 
-// Difficulty Limits
 let hintsRemaining = 2;
 let undosRemaining = 2;
 
-// Calendar State
 let calViewYear = new Date().getFullYear();
 let calViewMonth = new Date().getMonth();
 
-// Storage Data
 let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
-  played: 0,
-  won: 0,
-  losses: 0,
-  bestTime: null
+  played: 0, won: 0, losses: 0, bestTime: null
 };
 
 let completedDailies = JSON.parse(localStorage.getItem('sudoku_completed_dailies')) || [];
 let rewards = JSON.parse(localStorage.getItem('sudoku_rewards')) || [];
 
-// Audio Synthesizer (Lazy loaded to prevent mobile crashes)
-let audioCtx = null;
-
-function playSound(type) {
-  try {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    if (type === 'click') {
-      osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.08);
-    } else if (type === 'error') {
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.2);
-    } else if (type === 'win') {
-      const notes = [261.63, 329.63, 392.00, 523.25];
-      notes.forEach((freq, idx) => {
-        const subOsc = audioCtx.createOscillator();
-        const subGain = audioCtx.createGain();
-        subOsc.connect(subGain);
-        subGain.connect(audioCtx.destination);
-        subOsc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
-        subGain.gain.setValueAtTime(0.08, audioCtx.currentTime + idx * 0.12);
-        subGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.12 + 0.25);
-        subOsc.start(audioCtx.currentTime + idx * 0.12);
-        subOsc.stop(audioCtx.currentTime + idx * 0.12 + 0.25);
-      });
-    }
-  } catch (e) {
-    // Graceful fallback if mobile browser blocks audio
-  }
-}
-
-// Initialize Application
-document.addEventListener('DOMContentLoaded', () => {
-  buildKeypad();
-  startNewGame(null);
-  setupEventListeners();
-});
-
 function startNewGame(dateStr = null) {
-  clearInterval(timerInterval);
+  if (timerInterval) clearInterval(timerInterval);
   secondsElapsed = 0;
   mistakes = 0;
   isPaused = false;
@@ -152,7 +90,6 @@ function updateActionButtonLabels() {
 }
 
 function togglePause() {
-  playSound('click');
   isPaused = !isPaused;
   const btnPause = document.getElementById('btn-pause');
   const boardEl = document.getElementById('board');
@@ -170,7 +107,6 @@ function togglePause() {
 }
 
 function toggleNotesMode() {
-  playSound('click');
   isNotesMode = !isNotesMode;
   const btnNotes = document.getElementById('btn-notes');
   if (btnNotes) {
@@ -302,7 +238,6 @@ function renderBoard() {
 }
 
 function selectCell(r, c) {
-  playSound('click');
   selectedCell = { r, c };
   const cells = document.querySelectorAll('.cell');
   const selectedVal = currentBoard[r][c];
@@ -347,7 +282,6 @@ function handleInput(num) {
 
   if (isNotesMode) {
     if (currentBoard[r][c] === 0) {
-      playSound('click');
       if (notesBoard[r][c].has(num)) {
         notesBoard[r][c].delete(num);
       } else {
@@ -370,7 +304,6 @@ function handleInput(num) {
     notesBoard[r][c].clear();
 
     if (num !== solution[r][c]) {
-      playSound('error');
       mistakes++;
       updateMistakesDisplay();
       if (mistakes >= MAX_MISTAKES) {
@@ -378,7 +311,6 @@ function handleInput(num) {
         return;
       }
     } else {
-      playSound('click');
       autoClearNotes(r, c, num);
     }
 
@@ -405,7 +337,6 @@ function autoClearNotes(r, c, num) {
 
 function eraseInput() {
   if (isPaused || !selectedCell) return;
-  playSound('click');
   const { r, c } = selectedCell;
   if (initialBoard[r][c] !== 0) return;
 
@@ -424,7 +355,6 @@ function eraseInput() {
 
 function undoMove() {
   if (isPaused || historyStack.length === 0 || undosRemaining <= 0) return;
-  playSound('click');
 
   const lastMove = historyStack.pop();
   currentBoard[lastMove.r][lastMove.c] = lastMove.prevVal;
@@ -442,7 +372,6 @@ function giveHint() {
   const { r, c } = selectedCell;
 
   if (initialBoard[r][c] !== 0 || currentBoard[r][c] === solution[r][c]) return;
-  playSound('click');
 
   historyStack.push({ 
     r, c, 
@@ -472,12 +401,10 @@ function checkWinCondition() {
 }
 
 function endGame(isWin) {
-  clearInterval(timerInterval);
+  if (timerInterval) clearInterval(timerInterval);
   stats.played++;
 
   if (isWin) {
-    playSound('win');
-    triggerConfetti();
     stats.won++;
     if (!stats.bestTime || secondsElapsed < stats.bestTime) {
       stats.bestTime = secondsElapsed;
@@ -526,7 +453,6 @@ function checkMonthTrophy(dateStr) {
 }
 
 function openCalendarModal() {
-  playSound('click');
   renderCalendar(calViewYear, calViewMonth);
   const calendarModal = document.getElementById('calendar-modal');
   if (calendarModal) calendarModal.classList.add('active');
@@ -572,7 +498,6 @@ function renderCalendar(year, month) {
 }
 
 function openRewardsModal() {
-  playSound('click');
   const trophyGrid = document.getElementById('trophy-grid');
   if (!trophyGrid) return;
   trophyGrid.innerHTML = '';
@@ -595,38 +520,6 @@ function openRewardsModal() {
   if (rewardsModal) rewardsModal.classList.add('active');
 }
 
-function triggerConfetti() {
-  const confettiCanvas = document.getElementById('confetti-canvas');
-  if (!confettiCanvas) return;
-  const ctx = confettiCanvas.getContext('2d');
-  confettiCanvas.width = window.innerWidth;
-  confettiCanvas.height = window.innerHeight;
-
-  const particles = Array.from({ length: 80 }, () => ({
-    x: Math.random() * confettiCanvas.width,
-    y: Math.random() * confettiCanvas.height - confettiCanvas.height,
-    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-    size: Math.random() * 8 + 4,
-    speedY: Math.random() * 4 + 2,
-    speedX: Math.random() * 2 - 1
-  }));
-
-  let frame = 0;
-  function render() {
-    ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
-    particles.forEach(p => {
-      p.y += p.speedY;
-      p.x += p.speedX;
-      ctx.fillStyle = p.color;
-      ctx.fillRect(p.x, p.y, p.size, p.size);
-    });
-    frame++;
-    if (frame < 160) requestAnimationFrame(render);
-    else ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
-  }
-  render();
-}
-
 function showEndModal(title, message) {
   const titleEl = document.getElementById('modal-title');
   const msgEl = document.getElementById('modal-message');
@@ -637,7 +530,6 @@ function showEndModal(title, message) {
 }
 
 function openStatsModal() {
-  playSound('click');
   const playedEl = document.getElementById('stat-played');
   const wonEl = document.getElementById('stat-won');
   const winrateEl = document.getElementById('stat-winrate');
@@ -663,5 +555,82 @@ function openStatsModal() {
   if (statsModal) statsModal.classList.add('active');
 }
 
-function setupEventListeners() {
-  const btnPause = document.getElementBy
+document.addEventListener('DOMContentLoaded', () => {
+  buildKeypad();
+  startNewGame(null);
+
+  const btnPause = document.getElementById('btn-pause');
+  const btnNotes = document.getElementById('btn-notes');
+  const btnNew = document.getElementById('btn-new');
+  const btnDaily = document.getElementById('btn-daily');
+  const btnRewards = document.getElementById('btn-rewards');
+  const btnErase = document.getElementById('btn-erase');
+  const btnUndo = document.getElementById('btn-undo');
+  const btnHint = document.getElementById('btn-hint');
+  const btnStats = document.getElementById('btn-stats');
+  const difficultyEl = document.getElementById('difficulty');
+  const themeToggle = document.getElementById('theme-toggle');
+
+  if (btnPause) btnPause.addEventListener('click', togglePause);
+  if (btnNotes) btnNotes.addEventListener('click', toggleNotesMode);
+  if (btnNew) btnNew.addEventListener('click', () => startNewGame(null));
+  if (btnDaily) btnDaily.addEventListener('click', openCalendarModal);
+  if (btnRewards) btnRewards.addEventListener('click', openRewardsModal);
+  if (btnErase) btnErase.addEventListener('click', eraseInput);
+  if (btnUndo) btnUndo.addEventListener('click', undoMove);
+  if (btnHint) btnHint.addEventListener('click', giveHint);
+  if (btnStats) btnStats.addEventListener('click', openStatsModal);
+  if (difficultyEl) difficultyEl.addEventListener('change', () => startNewGame(activeDateStr));
+
+  const calPrev = document.getElementById('cal-prev-month');
+  const calNext = document.getElementById('cal-next-month');
+  const calClose = document.getElementById('calendar-close-btn');
+  const rewardsClose = document.getElementById('rewards-close-btn');
+  const modalClose = document.getElementById('modal-close-btn');
+  const statsClose = document.getElementById('stats-close-btn');
+
+  if (calPrev) calPrev.addEventListener('click', () => {
+    calViewMonth--;
+    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+    renderCalendar(calViewYear, calViewMonth);
+  });
+
+  if (calNext) calNext.addEventListener('click', () => {
+    calViewMonth++;
+    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+    renderCalendar(calViewYear, calViewMonth);
+  });
+
+  if (calClose) calClose.addEventListener('click', () => {
+    const calendarModal = document.getElementById('calendar-modal');
+    if (calendarModal) calendarModal.classList.remove('active');
+  });
+
+  if (rewardsClose) rewardsClose.addEventListener('click', () => {
+    const rewardsModal = document.getElementById('rewards-modal');
+    if (rewardsModal) rewardsModal.classList.remove('active');
+  });
+
+  if (modalClose) modalClose.addEventListener('click', () => {
+    const gameModal = document.getElementById('game-modal');
+    if (gameModal) gameModal.classList.remove('active');
+    startNewGame(null);
+  });
+
+  if (statsClose) statsClose.addEventListener('click', () => {
+    const statsModal = document.getElementById('stats-modal');
+    if (statsModal) statsModal.classList.remove('active');
+  });
+
+  if (themeToggle) themeToggle.addEventListener('click', () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      document.body.removeAttribute('data-theme');
+      themeToggle.textContent = '🌙 Dark';
+    } else {
+      document.body.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '☀️ Light';
+    }
+  });
+});
+  
