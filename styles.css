@@ -9,7 +9,6 @@
   --highlight-bg: #93c5fd;
   --error-color: #e74c3c;
   --primary-color: #3498db;
-  --primary-hover: #2980b9;
   --given-color: #1e293b;
   --input-color: #0284c7;
   --note-color: #64748b;
@@ -28,7 +27,6 @@
   --highlight-bg: #1e3a8a;
   --error-color: #ef4444;
   --primary-color: #38bdf8;
-  --primary-hover: #0284c7;
   --given-color: #ffffff;
   --input-color: #4ade80;
   --note-color: #94a3b8;
@@ -130,7 +128,6 @@ select {
   cursor: pointer;
 }
 
-/* Board Wrapper & Blur Effect */
 .board-wrapper {
   position: relative;
   width: 100%;
@@ -198,7 +195,6 @@ select {
 }
 .cell.error { color: var(--error-color) !important; background-color: rgba(239, 68, 68, 0.25); }
 
-/* Pencil Notes */
 .notes-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -217,7 +213,6 @@ select {
 
 .cell.selected .note-num { color: #ffffff; }
 
-/* Control Action Buttons */
 .action-buttons {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -243,7 +238,6 @@ select {
 .btn-secondary { background-color: #64748b; }
 .btn-active-mode { background-color: #059669 !important; }
 
-/* Keypad */
 .keypad {
   display: grid;
   grid-template-columns: repeat(9, 1fr);
@@ -273,7 +267,6 @@ select {
   transform: scale(0.92);
 }
 
-/* Modals */
 .modal-overlay {
   display: none;
   position: fixed;
@@ -296,7 +289,6 @@ select {
   box-shadow: 0 10px 25px rgba(0,0,0,0.3);
 }
 
-/* Calendar Modal Custom Styling */
 .calendar-header {
   display: flex;
   justify-content: space-between;
@@ -341,7 +333,6 @@ select {
 .cal-day.completed::after { content: "✓"; font-size: 0.65rem; color: var(--success-color); }
 .cal-day.today { background: var(--primary-color); color: #fff; }
 
-/* Trophy & Rewards Gallery */
 .rewards-subtitle { font-size: 0.8rem; opacity: 0.8; margin-top: -8px; margin-bottom: 14px; }
 .trophy-grid {
   display: grid;
@@ -363,7 +354,6 @@ select {
 
 .trophy-icon { font-size: 2.2rem; margin-bottom: 4px; }
 .trophy-title { font-size: 0.8rem; font-weight: bold; }
-.trophy-card.locked { opacity: 0.4; filter: grayscale(100%); }
 
 .stats-grid {
   display: grid;
@@ -383,4 +373,4 @@ select {
 .stat-number { font-size: 1.3rem; font-weight: bold; color: var(--primary-color); }
 .stat-label { font-size: 0.75rem; opacity: 0.8; }
 .modal-btn { width: 100%; padding: 10px; margin-top: 8px; }
-  
+                    
