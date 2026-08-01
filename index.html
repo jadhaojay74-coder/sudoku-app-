@@ -19,7 +19,7 @@
     </div>
   </header>
 
-  <div class="status-bar">
+  <div class="status-bar" id="status-bar">
     <div class="status-item">
       <span>Mode:</span>
       <select id="difficulty">
@@ -28,11 +28,11 @@
         <option value="hard">Hard</option>
       </select>
     </div>
-    <div class="status-item">
+    <div class="status-item" id="mistakes-wrapper">
       <span>Mistakes:</span>
       <strong id="mistakes-count" class="mistake-text">0/3</strong>
     </div>
-    <div class="status-item">
+    <div class="status-item" id="timer-wrapper">
       <span>Time:</span>
       <strong id="timer">00:00</strong>
     </div>
@@ -48,9 +48,11 @@
   <div class="action-buttons">
     <button class="btn" id="btn-pause">Pause</button>
     <button class="btn" id="btn-notes">Notes (OFF)</button>
+    <button class="btn" id="btn-auto-notes">🪄 Auto-Notes</button>
     <button class="btn" id="btn-undo">Undo (2)</button>
     <button class="btn" id="btn-hint">Hint (2)</button>
     <button class="btn" id="btn-erase">Erase</button>
+    <button class="btn" id="btn-zen">🧘 Zen (OFF)</button>
     <button class="btn btn-secondary" id="btn-daily">Calendar</button>
     <button class="btn btn-secondary" id="btn-rewards">Rewards</button>
     <button class="btn btn-secondary" id="btn-stats">Stats</button>
