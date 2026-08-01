@@ -13,7 +13,10 @@
 <div class="container">
   <header>
     <h1>Sudoku</h1>
-    <button class="theme-btn" id="theme-toggle">🌙 Dark</button>
+    <div class="header-actions">
+      <span class="streak-badge" id="streak-display">🔥 0</span>
+      <button class="theme-btn" id="theme-toggle">🌙 Dark</button>
+    </div>
   </header>
 
   <div class="status-bar">
@@ -61,7 +64,7 @@
   <div class="modal-content calendar-modal-content">
     <div class="calendar-header">
       <button class="btn btn-secondary" id="cal-prev-month">&lt;</button>
-      <h3 id="calendar-month-title">August 2026</h3>
+      <h3 id="calendar-month-title">Calendar</h3>
       <button class="btn btn-secondary" id="cal-next-month">&gt;</button>
     </div>
     <div class="calendar-weekdays">
@@ -85,7 +88,10 @@
   <div class="modal-content">
     <h2 id="modal-title">Game Over</h2>
     <p id="modal-message">You reached 3 mistakes!</p>
-    <button class="btn modal-btn" id="modal-close-btn">Play Again</button>
+    <div class="modal-action-row">
+      <button class="btn btn-secondary" id="modal-share-btn">📋 Share Result</button>
+      <button class="btn modal-btn" id="modal-close-btn">Play Again</button>
+    </div>
   </div>
 </div>
 
