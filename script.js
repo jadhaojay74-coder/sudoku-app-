@@ -1,8 +1,8 @@
-// Game State Variables
+// Game State
 let solution = [];
 let initialBoard = [];
 let currentBoard = [];
-let notesBoard = []; // 9x9 array containing Sets of candidate numbers
+let notesBoard = [];
 let historyStack = [];
 let selectedCell = null;
 let timerInterval = null;
@@ -10,14 +10,18 @@ let secondsElapsed = 0;
 let mistakes = 0;
 let isPaused = false;
 let isNotesMode = false;
-let isDailyChallenge = false;
+let activeDateStr = null; // Stored if playing Daily Challenge (e.g., "2026-08-01")
 const MAX_MISTAKES = 3;
 
 // Limits per difficulty
 let hintsRemaining = 2;
 let undosRemaining = 2;
 
-// Performance Statistics Storage
+// Calendar State
+let calViewYear = new Date().getFullYear();
+let calViewMonth = new Date().getMonth();
+
+// Storage Data
 let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
   played: 0,
   won: 0,
@@ -25,24 +29,31 @@ let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
   bestTime: null
 };
 
+let completedDailies = JSON.parse(localStorage.getItem('sudoku_completed_dailies')) || [];
+let rewards = JSON.parse(localStorage.getItem('sudoku_rewards')) || [];
+
 // DOM Elements
 const boardEl = document.getElementById('board');
 const keypadEl = document.getElementById('keypad');
 const timerEl = document.getElementById('timer');
 const mistakesEl = document.getElementById('mistakes-count');
 const difficultyEl = document.getElementById('difficulty');
+const gameModeBanner = document.getElementById('game-mode-banner');
 const themeToggle = document.getElementById('theme-toggle');
 const btnPause = document.getElementById('btn-pause');
 const btnNotes = document.getElementById('btn-notes');
 const btnUndo = document.getElementById('btn-undo');
 const btnHint = document.getElementById('btn-hint');
 const btnDaily = document.getElementById('btn-daily');
-const btnPrint = document.getElementById('btn-print');
+const btnRewards = document.getElementById('btn-rewards');
 const pauseOverlay = document.getElementById('pause-overlay');
 const confettiCanvas = document.getElementById('confetti-canvas');
 
+// Modals
 const gameModal = document.getElementById('game-modal');
 const statsModal = document.getElementById('stats-modal');
+const calendarModal = document.getElementById('calendar-modal');
+const rewardsModal = document.getElementById('rewards-modal');
 
 // Audio Synthesizer via Web Audio API
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -85,17 +96,23 @@ function playSound(type) {
 
 window.onload = () => {
   buildKeypad();
-  startNewGame(false);
+  startNewGame(null);
   setupEventListeners();
 };
 
-function startNewGame(daily = false) {
+function startNewGame(dateStr = null) {
   clearInterval(timerInterval);
   secondsElapsed = 0;
   mistakes = 0;
   isPaused = false;
   isNotesMode = false;
-  isDailyChallenge = daily;
+  activeDateStr = dateStr;
+
+  if (activeDateStr) {
+    gameModeBanner.textContent = `📅 Daily Challenge: ${activeDateStr}`;
+  } else {
+    gameModeBanner.textContent = `Standard Practice Game`;
+  }
 
   btnPause.textContent = "Pause";
   btnNotes.textContent = "Notes (OFF)";
@@ -119,7 +136,7 @@ function startNewGame(daily = false) {
     }
   }, 1000);
 
-  generateSudoku(daily);
+  generateSudoku(activeDateStr);
   historyStack = [];
   selectedCell = null;
   renderBoard();
@@ -163,7 +180,7 @@ function updateMistakesDisplay() {
   mistakesEl.textContent = `${mistakes}/${MAX_MISTAKES}`;
 }
 
-// Pseudo Random Number Generator for Daily Challenge
+// Pseudo Random Seed Generator
 function seededRandom(seed) {
   const x = Math.sin(seed++) * 10000;
   return x - Math.floor(x);
@@ -179,7 +196,7 @@ function shuffle(array, seed = null) {
   return arr;
 }
 
-function generateSudoku(daily = false) {
+function generateSudoku(dateStr = null) {
   const base = [
     [1, 2, 3, 4, 5, 6, 7, 8, 9],
     [4, 5, 6, 7, 8, 9, 1, 2, 3],
@@ -193,9 +210,8 @@ function generateSudoku(daily = false) {
   ];
 
   let seed = null;
-  if (daily) {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    seed = parseInt(today, 10);
+  if (dateStr) {
+    seed = parseInt(dateStr.replace(/-/g, ''), 10);
   }
 
   const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], seed);
@@ -356,7 +372,6 @@ function handleInput(num) {
   }
 }
 
-// Smart Auto-Clear Notes in Row, Column, and Box
 function autoClearNotes(r, c, num) {
   for (let i = 0; i < 9; i++) {
     notesBoard[r][i].delete(num);
@@ -451,6 +466,16 @@ function endGame(isWin) {
     if (!stats.bestTime || secondsElapsed < stats.bestTime) {
       stats.bestTime = secondsElapsed;
     }
+
+    // Process Daily Challenge Completion & Monthly Trophy
+    if (activeDateStr) {
+      if (!completedDailies.includes(activeDateStr)) {
+        completedDailies.push(activeDateStr);
+        localStorage.setItem('sudoku_completed_dailies', JSON.stringify(completedDailies));
+      }
+      checkMonthTrophy(activeDateStr);
+    }
+
     showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl.textContent}!`);
   } else {
     stats.losses++;
@@ -458,6 +483,99 @@ function endGame(isWin) {
   }
 
   localStorage.setItem('sudoku_stats', JSON.stringify(stats));
+}
+
+// Monthly Trophy Evaluator
+function checkMonthTrophy(dateStr) {
+  const [year, month] = dateStr.split('-').map(Number);
+  const totalDaysInMonth = new Date(year, month, 0).getDate();
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+
+  let daysCompleted = 0;
+  for (let d = 1; d <= totalDaysInMonth; d++) {
+    const checkDateStr = `${monthKey}-${String(d).padStart(2, '0')}`;
+    if (completedDailies.includes(checkDateStr)) daysCompleted++;
+  }
+
+  if (daysCompleted >= totalDaysInMonth) {
+    if (!rewards.some(r => r.monthKey === monthKey)) {
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      rewards.push({
+        monthKey: monthKey,
+        title: `${monthNames[month - 1]} ${year}`,
+        icon: "🏆"
+      });
+      localStorage.setItem('sudoku_rewards', JSON.stringify(rewards));
+    }
+  }
+}
+
+/* Calendar Generator */
+function openCalendarModal() {
+  playSound('click');
+  renderCalendar(calViewYear, calViewMonth);
+  calendarModal.classList.add('active');
+}
+
+function renderCalendar(year, month) {
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  document.getElementById('calendar-month-title').textContent = `${monthNames[month]} ${year}`;
+
+  const calGrid = document.getElementById('calendar-grid');
+  calGrid.innerHTML = '';
+
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Blank slots for previous month alignment
+  for (let i = 0; i < firstDayIndex; i++) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.classList.add('cal-day', 'empty');
+    calGrid.appendChild(emptyDiv);
+  }
+
+  // Days of current month
+  for (let day = 1; day <= totalDays; day++) {
+    const dayBtn = document.createElement('div');
+    dayBtn.classList.add('cal-day');
+    dayBtn.textContent = day;
+
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    if (completedDailies.includes(dateStr)) dayBtn.classList.add('completed');
+    if (dateStr === todayStr) dayBtn.classList.add('today');
+
+    dayBtn.addEventListener('click', () => {
+      calendarModal.classList.remove('active');
+      startNewGame(dateStr);
+    });
+
+    calGrid.appendChild(dayBtn);
+  }
+}
+
+/* Trophy Showcase Generator */
+function openRewardsModal() {
+  playSound('click');
+  const trophyGrid = document.getElementById('trophy-grid');
+  trophyGrid.innerHTML = '';
+
+  if (rewards.length === 0) {
+    trophyGrid.innerHTML = `<p style="grid-column: span 2; opacity:0.6;">No trophies earned yet.<br>Complete all days in a month to unlock one!</p>`;
+  } else {
+    rewards.forEach(reward => {
+      const card = document.createElement('div');
+      card.classList.add('trophy-card');
+      card.innerHTML = `
+        <div class="trophy-icon">${reward.icon}</div>
+        <div class="trophy-title">${reward.title}</div>
+      `;
+      trophyGrid.appendChild(card);
+    });
+  }
+
+  rewardsModal.classList.add('active');
 }
 
 function triggerConfetti() {
@@ -518,51 +636,26 @@ function openStatsModal() {
 function setupEventListeners() {
   btnPause.addEventListener('click', togglePause);
   btnNotes.addEventListener('click', toggleNotesMode);
-  document.getElementById('btn-new').addEventListener('click', () => startNewGame(false));
-  btnDaily.addEventListener('click', () => startNewGame(true));
-  btnPrint.addEventListener('click', () => window.print());
+  document.getElementById('btn-new').addEventListener('click', () => startNewGame(null));
+  btnDaily.addEventListener('click', openCalendarModal);
+  btnRewards.addEventListener('click', openRewardsModal);
   document.getElementById('btn-erase').addEventListener('click', eraseInput);
   btnUndo.addEventListener('click', undoMove);
   btnHint.addEventListener('click', giveHint);
   document.getElementById('btn-stats').addEventListener('click', openStatsModal);
-  difficultyEl.addEventListener('change', () => startNewGame(isDailyChallenge));
+  difficultyEl.addEventListener('change', () => startNewGame(activeDateStr));
 
-  document.getElementById('modal-close-btn').addEventListener('click', () => {
-    gameModal.classList.remove('active');
-    startNewGame(false);
+  // Calendar Controls
+  document.getElementById('cal-prev-month').addEventListener('click', () => {
+    calViewMonth--;
+    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+    renderCalendar(calViewYear, calViewMonth);
   });
 
-  document.getElementById('stats-close-btn').addEventListener('click', () => {
-    statsModal.classList.remove('active');
+  document.getElementById('cal-next-month').addEventListener('click', () => {
+    calViewMonth++;
+    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+    renderCalendar(calViewYear, calViewMonth);
   });
 
-  document.addEventListener('keydown', (e) => {
-    if (isPaused || !selectedCell) return;
-    if (e.key >= '1' && e.key <= '9') {
-      handleInput(parseInt(e.key));
-    } else if (e.key === 'Backspace' || e.key === 'Delete') {
-      eraseInput();
-    } else if (e.key.toLowerCase() === 'n') {
-      toggleNotesMode();
-    } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      let { r, c } = selectedCell;
-      if (e.key === 'ArrowUp') r = (r - 1 + 9) % 9;
-      if (e.key === 'ArrowDown') r = (r + 1) % 9;
-      if (e.key === 'ArrowLeft') c = (c - 1 + 9) % 9;
-      if (e.key === 'ArrowRight') c = (c + 1) % 9;
-      selectCell(r, c);
-    }
-  });
-
-  themeToggle.addEventListener('click', () => {
-    playSound('click');
-    const isDark = document.body.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-      document.body.removeAttribute('data-theme');
-      themeToggle.textContent = '🌙 Dark';
-    } else {
-      document.body.setAttribute('data-theme', 'dark');
-      themeToggle.textContent = '☀️ Light';
-    }
-  });
-}
+  document.getElementById('calendar-close-btn').addEve
