@@ -20,19 +20,39 @@ let undosRemaining = 2;
 let calViewYear = new Date().getFullYear();
 let calViewMonth = new Date().getMonth();
 
-let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
-  played: 0, won: 0, losses: 0, bestTime: null
-};
+let stats = { played: 0, won: 0, losses: 0, bestTime: null };
+try {
+  const savedStats = localStorage.getItem('sudoku_stats');
+  if (savedStats) stats = JSON.parse(savedStats);
+} catch (e) {
+  console.warn("Failed to parse stats from localStorage:", e);
+}
 
-let completedDailies = JSON.parse(localStorage.getItem('sudoku_completed_dailies')) || [];
-let rewards = JSON.parse(localStorage.getItem('sudoku_rewards')) || [];
+let completedDailies = [];
+try {
+  const savedDailies = localStorage.getItem('sudoku_completed_dailies');
+  if (savedDailies) completedDailies = JSON.parse(savedDailies);
+} catch (e) {
+  console.warn("Failed to parse completed dailies:", e);
+}
+
+let rewards = [];
+try {
+  const savedRewards = localStorage.getItem('sudoku_rewards');
+  if (savedRewards) rewards = JSON.parse(savedRewards);
+} catch (e) {
+  console.warn("Failed to parse rewards:", e);
+}
 
 function startNewGame(dateStr = null, loadSaved = false) {
   if (timerInterval) clearInterval(timerInterval);
   
-  if (loadSaved && loadGameState()) {
-    // Game restored from localStorage
-  } else {
+  let loaded = false;
+  if (loadSaved) {
+    loaded = loadGameState();
+  }
+
+  if (!loaded) {
     secondsElapsed = 0;
     mistakes = 0;
     isPaused = false;
@@ -95,12 +115,16 @@ function triggerHaptic(type = 'light') {
 }
 
 function saveGameState() {
-  const gameState = {
-    solution, initialBoard, currentBoard,
-    notesBoard: notesBoard.map(row => row.map(set => Array.from(set))),
-    secondsElapsed, mistakes, activeDateStr, hintsRemaining, undosRemaining, isZenMode
-  };
-  localStorage.setItem('sudoku_saved_state', JSON.stringify(gameState));
+  try {
+    const gameState = {
+      solution, initialBoard, currentBoard,
+      notesBoard: notesBoard.map(row => row.map(set => (set instanceof Set ? Array.from(set) : []))),
+      secondsElapsed, mistakes, activeDateStr, hintsRemaining, undosRemaining, isZenMode
+    };
+    localStorage.setItem('sudoku_saved_state', JSON.stringify(gameState));
+  } catch (e) {
+    console.error("Save state error:", e);
+  }
 }
 
 function loadGameState() {
@@ -108,19 +132,25 @@ function loadGameState() {
   if (!saved) return false;
   try {
     const data = JSON.parse(saved);
+    if (!data.solution || !data.currentBoard || !data.notesBoard) return false;
+
     solution = data.solution;
     initialBoard = data.initialBoard;
     currentBoard = data.currentBoard;
-    notesBoard = data.notesBoard.map(row => row.map(arr => new Set(arr)));
-    secondsElapsed = data.secondsElapsed;
-    mistakes = data.mistakes;
-    activeDateStr = data.activeDateStr;
-    hintsRemaining = data.hintsRemaining;
-    undosRemaining = data.undosRemaining;
+    notesBoard = data.notesBoard.map(row => 
+      row.map(arr => new Set(Array.isArray(arr) ? arr : []))
+    );
+    secondsElapsed = data.secondsElapsed || 0;
+    mistakes = data.mistakes || 0;
+    activeDateStr = data.activeDateStr || null;
+    hintsRemaining = data.hintsRemaining ?? 2;
+    undosRemaining = data.undosRemaining ?? 2;
     isZenMode = !!data.isZenMode;
     applyZenModeUI();
     return true;
   } catch (e) {
+    console.warn("Failed to load saved state, starting fresh board:", e);
+    localStorage.removeItem('sudoku_saved_state');
     return false;
   }
 }
@@ -151,6 +181,7 @@ function autoFillNotes() {
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
       if (currentBoard[r][c] === 0) {
+        if (!(notesBoard[r][c] instanceof Set)) notesBoard[r][c] = new Set();
         notesBoard[r][c].clear();
         for (let num = 1; num <= 9; num++) {
           if (isValidPlacement(r, c, num)) {
@@ -193,7 +224,7 @@ function updateActionButtonLabels() {
 }
 
 function calculateStreak() {
-  if (completedDailies.length === 0) return 0;
+  if (!Array.isArray(completedDailies) || completedDailies.length === 0) return 0;
   const sorted = [...new Set(completedDailies)].sort().reverse();
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -351,7 +382,7 @@ function renderBoard() {
             cell.classList.add('error');
           }
         }
-      } else if (notes && notes.size > 0) {
+      } else if (notes && notes instanceof Set && notes.size > 0) {
         const notesGrid = document.createElement('div');
         notesGrid.classList.add('notes-grid');
         for (let i = 1; i <= 9; i++) {
@@ -414,6 +445,7 @@ function buildKeypad() {
 }
 
 function updateKeypadCounts() {
+  if (!solution || solution.length < 9) return;
   const counts = Array(10).fill(0);
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
@@ -441,6 +473,8 @@ function handleInput(num) {
   const { r, c } = selectedCell;
 
   if (initialBoard[r][c] !== 0) return;
+
+  if (!(notesBoard[r][c] instanceof Set)) notesBoard[r][c] = new Set();
 
   if (isNotesMode) {
     if (currentBoard[r][c] === 0) {
@@ -517,15 +551,16 @@ function checkLineCompletions(r, c) {
 
 function autoClearNotes(r, c, num) {
   for (let i = 0; i < 9; i++) {
-    notesBoard[r][i].delete(num);
-    notesBoard[i][c].delete(num);
+    if (notesBoard[r][i] instanceof Set) notesBoard[r][i].delete(num);
+    if (notesBoard[i][c] instanceof Set) notesBoard[i][c].delete(num);
   }
 
   const boxStartRow = Math.floor(r / 3) * 3;
   const boxStartCol = Math.floor(c / 3) * 3;
   for (let br = 0; br < 3; br++) {
     for (let bc = 0; bc < 3; bc++) {
-      notesBoard[boxStartRow + br][boxStartCol + bc].delete(num);
+      const target = notesBoard[boxStartRow + br][boxStartCol + bc];
+      if (target instanceof Set) target.delete(num);
     }
   }
 }
@@ -535,15 +570,15 @@ function eraseInput() {
   const { r, c } = selectedCell;
   if (initialBoard[r][c] !== 0) return;
 
-  if (currentBoard[r][c] !== 0 || notesBoard[r][c].size > 0) {
+  if (currentBoard[r][c] !== 0 || (notesBoard[r][c] instanceof Set && notesBoard[r][c].size > 0)) {
     triggerHaptic('light');
     historyStack.push({ 
       r, c, 
       prevVal: currentBoard[r][c],
-      prevNotes: new Set(notesBoard[r][c])
+      prevNotes: new Set(notesBoard[r][c] instanceof Set ? notesBoard[r][c] : [])
     });
     currentBoard[r][c] = 0;
-    notesBoard[r][c].clear();
+    if (notesBoard[r][c] instanceof Set) notesBoard[r][c].clear();
     renderBoard();
     selectCell(r, c);
     updateKeypadCounts();
@@ -578,11 +613,11 @@ function giveHint() {
   historyStack.push({ 
     r, c, 
     prevVal: currentBoard[r][c],
-    prevNotes: new Set(notesBoard[r][c])
+    prevNotes: new Set(notesBoard[r][c] instanceof Set ? notesBoard[r][c] : [])
   });
 
   currentBoard[r][c] = solution[r][c];
-  notesBoard[r][c].clear();
+  if (notesBoard[r][c] instanceof Set) notesBoard[r][c].clear();
   autoClearNotes(r, c, solution[r][c]);
 
   hintsRemaining--;
@@ -658,43 +693,4 @@ function triggerConfetti() {
       p.y += p.speedY;
       p.x += p.speedX;
       ctx.fillStyle = p.color;
-      ctx.fillRect(p.x, p.y, p.size, p.size);
-    });
-    frame++;
-    if (frame < 140) requestAnimationFrame(render);
-    else ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
-  render();
-}
-
-function checkMonthTrophy(dateStr) {
-  const [year, month] = dateStr.split('-').map(Number);
-  const totalDaysInMonth = new Date(year, month, 0).getDate();
-  const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-
-  let daysCompleted = 0;
-  for (let d = 1; d <= totalDaysInMonth; d++) {
-    const checkDateStr = `${monthKey}-${String(d).padStart(2, '0')}`;
-    if (completedDailies.includes(checkDateStr)) daysCompleted++;
-  }
-
-  if (daysCompleted >= totalDaysInMonth) {
-    if (!rewards.some(r => r.monthKey === monthKey)) {
-      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-      rewards.push({
-        monthKey: monthKey,
-        title: `${monthNames[month - 1]} ${year}`,
-        icon: "🏆"
-      });
-      localStorage.setItem('sudoku_rewards', JSON.stringify(rewards));
-    }
-  }
-}
-
-function shareResult() {
-  const timerEl = document.getElementById('timer');
-  const difficultyEl = document.getElementById('difficulty');
-  const mode = activeDateStr ? `Daily Challenge (${activeDateStr})` : `Practice (${difficultyEl ? difficultyEl.value : ''})`;
-  const streak = calculateStreak();
-
-  const shareTe
+      ctx.fillR
