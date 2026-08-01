@@ -1,4 +1,4 @@
-// Game State
+// Game State Variables
 let solution = [];
 let initialBoard = [];
 let currentBoard = [];
@@ -10,10 +10,10 @@ let secondsElapsed = 0;
 let mistakes = 0;
 let isPaused = false;
 let isNotesMode = false;
-let activeDateStr = null; // Stored if playing Daily Challenge (e.g., "2026-08-01")
+let activeDateStr = null;
 const MAX_MISTAKES = 3;
 
-// Limits per difficulty
+// Difficulty Limits
 let hintsRemaining = 2;
 let undosRemaining = 2;
 
@@ -32,73 +32,61 @@ let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
 let completedDailies = JSON.parse(localStorage.getItem('sudoku_completed_dailies')) || [];
 let rewards = JSON.parse(localStorage.getItem('sudoku_rewards')) || [];
 
-// DOM Elements
-const boardEl = document.getElementById('board');
-const keypadEl = document.getElementById('keypad');
-const timerEl = document.getElementById('timer');
-const mistakesEl = document.getElementById('mistakes-count');
-const difficultyEl = document.getElementById('difficulty');
-const gameModeBanner = document.getElementById('game-mode-banner');
-const themeToggle = document.getElementById('theme-toggle');
-const btnPause = document.getElementById('btn-pause');
-const btnNotes = document.getElementById('btn-notes');
-const btnUndo = document.getElementById('btn-undo');
-const btnHint = document.getElementById('btn-hint');
-const btnDaily = document.getElementById('btn-daily');
-const btnRewards = document.getElementById('btn-rewards');
-const pauseOverlay = document.getElementById('pause-overlay');
-const confettiCanvas = document.getElementById('confetti-canvas');
-
-// Modals
-const gameModal = document.getElementById('game-modal');
-const statsModal = document.getElementById('stats-modal');
-const calendarModal = document.getElementById('calendar-modal');
-const rewardsModal = document.getElementById('rewards-modal');
-
-// Audio Synthesizer via Web Audio API
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// Audio Synthesizer (Lazy loaded to prevent mobile crashes)
+let audioCtx = null;
 
 function playSound(type) {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
 
-  if (type === 'click') {
-    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.08);
-  } else if (type === 'error') {
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.2);
-  } else if (type === 'win') {
-    const notes = [261.63, 329.63, 392.00, 523.25];
-    notes.forEach((freq, idx) => {
-      const subOsc = audioCtx.createOscillator();
-      const subGain = audioCtx.createGain();
-      subOsc.connect(subGain);
-      subGain.connect(audioCtx.destination);
-      subOsc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
-      subGain.gain.setValueAtTime(0.08, audioCtx.currentTime + idx * 0.12);
-      subGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.12 + 0.25);
-      subOsc.start(audioCtx.currentTime + idx * 0.12);
-      subOsc.stop(audioCtx.currentTime + idx * 0.12 + 0.25);
-    });
+    if (type === 'click') {
+      osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.08);
+    } else if (type === 'error') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.2);
+    } else if (type === 'win') {
+      const notes = [261.63, 329.63, 392.00, 523.25];
+      notes.forEach((freq, idx) => {
+        const subOsc = audioCtx.createOscillator();
+        const subGain = audioCtx.createGain();
+        subOsc.connect(subGain);
+        subGain.connect(audioCtx.destination);
+        subOsc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.12);
+        subGain.gain.setValueAtTime(0.08, audioCtx.currentTime + idx * 0.12);
+        subGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.12 + 0.25);
+        subOsc.start(audioCtx.currentTime + idx * 0.12);
+        subOsc.stop(audioCtx.currentTime + idx * 0.12 + 0.25);
+      });
+    }
+  } catch (e) {
+    // Graceful fallback if mobile browser blocks audio
   }
 }
 
-window.onload = () => {
+// Initialize Application
+document.addEventListener('DOMContentLoaded', () => {
   buildKeypad();
   startNewGame(null);
   setupEventListeners();
-};
+});
 
 function startNewGame(dateStr = null) {
   clearInterval(timerInterval);
@@ -108,19 +96,27 @@ function startNewGame(dateStr = null) {
   isNotesMode = false;
   activeDateStr = dateStr;
 
-  if (activeDateStr) {
-    gameModeBanner.textContent = `📅 Daily Challenge: ${activeDateStr}`;
-  } else {
-    gameModeBanner.textContent = `Standard Practice Game`;
+  const gameModeBanner = document.getElementById('game-mode-banner');
+  if (gameModeBanner) {
+    gameModeBanner.textContent = activeDateStr ? `📅 Daily Challenge: ${activeDateStr}` : `Standard Practice Game`;
   }
 
-  btnPause.textContent = "Pause";
-  btnNotes.textContent = "Notes (OFF)";
-  btnNotes.classList.remove('btn-active-mode');
-  boardEl.classList.remove('paused');
-  pauseOverlay.classList.remove('active');
+  const btnPause = document.getElementById('btn-pause');
+  const btnNotes = document.getElementById('btn-notes');
+  const boardEl = document.getElementById('board');
+  const pauseOverlay = document.getElementById('pause-overlay');
 
-  const diff = difficultyEl.value;
+  if (btnPause) btnPause.textContent = "Pause";
+  if (btnNotes) {
+    btnNotes.textContent = "Notes (OFF)";
+    btnNotes.classList.remove('btn-active-mode');
+  }
+  if (boardEl) boardEl.classList.remove('paused');
+  if (pauseOverlay) pauseOverlay.classList.remove('active');
+
+  const difficultyEl = document.getElementById('difficulty');
+  const diff = difficultyEl ? difficultyEl.value : 'medium';
+  
   if (diff === 'easy') { hintsRemaining = 3; undosRemaining = 3; }
   else if (diff === 'medium') { hintsRemaining = 2; undosRemaining = 2; }
   else { hintsRemaining = 1; undosRemaining = 1; }
@@ -143,44 +139,62 @@ function startNewGame(dateStr = null) {
 }
 
 function updateActionButtonLabels() {
-  btnUndo.textContent = `Undo (${undosRemaining})`;
-  btnHint.textContent = `Hint (${hintsRemaining})`;
-  btnUndo.disabled = undosRemaining <= 0;
-  btnHint.disabled = hintsRemaining <= 0;
+  const btnUndo = document.getElementById('btn-undo');
+  const btnHint = document.getElementById('btn-hint');
+  if (btnUndo) {
+    btnUndo.textContent = `Undo (${undosRemaining})`;
+    btnUndo.disabled = undosRemaining <= 0;
+  }
+  if (btnHint) {
+    btnHint.textContent = `Hint (${hintsRemaining})`;
+    btnHint.disabled = hintsRemaining <= 0;
+  }
 }
 
 function togglePause() {
   playSound('click');
   isPaused = !isPaused;
+  const btnPause = document.getElementById('btn-pause');
+  const boardEl = document.getElementById('board');
+  const pauseOverlay = document.getElementById('pause-overlay');
+
   if (isPaused) {
-    btnPause.textContent = "Resume";
-    boardEl.classList.add('paused');
-    pauseOverlay.classList.add('active');
+    if (btnPause) btnPause.textContent = "Resume";
+    if (boardEl) boardEl.classList.add('paused');
+    if (pauseOverlay) pauseOverlay.classList.add('active');
   } else {
-    btnPause.textContent = "Pause";
-    boardEl.classList.remove('paused');
-    pauseOverlay.classList.remove('active');
+    if (btnPause) btnPause.textContent = "Pause";
+    if (boardEl) boardEl.classList.remove('paused');
+    if (pauseOverlay) pauseOverlay.classList.remove('active');
   }
 }
 
 function toggleNotesMode() {
   playSound('click');
   isNotesMode = !isNotesMode;
-  btnNotes.textContent = `Notes (${isNotesMode ? 'ON' : 'OFF'})`;
-  btnNotes.classList.toggle('btn-active-mode', isNotesMode);
+  const btnNotes = document.getElementById('btn-notes');
+  if (btnNotes) {
+    btnNotes.textContent = `Notes (${isNotesMode ? 'ON' : 'OFF'})`;
+    btnNotes.classList.toggle('btn-active-mode', isNotesMode);
+  }
 }
 
 function updateTimerDisplay() {
-  const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-  const secs = String(secondsElapsed % 60).padStart(2, '0');
-  timerEl.textContent = `${mins}:${secs}`;
+  const timerEl = document.getElementById('timer');
+  if (timerEl) {
+    const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+    const secs = String(secondsElapsed % 60).padStart(2, '0');
+    timerEl.textContent = `${mins}:${secs}`;
+  }
 }
 
 function updateMistakesDisplay() {
-  mistakesEl.textContent = `${mistakes}/${MAX_MISTAKES}`;
+  const mistakesEl = document.getElementById('mistakes-count');
+  if (mistakesEl) {
+    mistakesEl.textContent = `${mistakes}/${MAX_MISTAKES}`;
+  }
 }
 
-// Pseudo Random Seed Generator
 function seededRandom(seed) {
   const x = Math.sin(seed++) * 10000;
   return x - Math.floor(x);
@@ -209,11 +223,7 @@ function generateSudoku(dateStr = null) {
     [9, 7, 8, 3, 1, 2, 6, 4, 5]
   ];
 
-  let seed = null;
-  if (dateStr) {
-    seed = parseInt(dateStr.replace(/-/g, ''), 10);
-  }
-
+  let seed = dateStr ? parseInt(dateStr.replace(/-/g, ''), 10) : null;
   const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], seed);
   const map = {};
   for (let i = 1; i <= 9; i++) map[i] = nums[i - 1];
@@ -227,7 +237,8 @@ function generateSudoku(dateStr = null) {
   }
 
   initialBoard = solution.map(row => [...row]);
-  const diff = difficultyEl.value;
+  const difficultyEl = document.getElementById('difficulty');
+  const diff = difficultyEl ? difficultyEl.value : 'medium';
   let removeCount = diff === 'easy' ? 35 : diff === 'medium' ? 45 : 54;
 
   let step = 0;
@@ -246,7 +257,10 @@ function generateSudoku(dateStr = null) {
 }
 
 function renderBoard() {
+  const boardEl = document.getElementById('board');
+  if (!boardEl) return;
   boardEl.innerHTML = '';
+
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
       const cell = document.createElement('div');
@@ -267,7 +281,7 @@ function renderBoard() {
             cell.classList.add('error');
           }
         }
-      } else if (notes.size > 0) {
+      } else if (notes && notes.size > 0) {
         const notesGrid = document.createElement('div');
         notesGrid.classList.add('notes-grid');
         for (let i = 1; i <= 9; i++) {
@@ -313,6 +327,8 @@ function selectCell(r, c) {
 }
 
 function buildKeypad() {
+  const keypadEl = document.getElementById('keypad');
+  if (!keypadEl) return;
   keypadEl.innerHTML = '';
   for (let i = 1; i <= 9; i++) {
     const key = document.createElement('button');
@@ -467,7 +483,6 @@ function endGame(isWin) {
       stats.bestTime = secondsElapsed;
     }
 
-    // Process Daily Challenge Completion & Monthly Trophy
     if (activeDateStr) {
       if (!completedDailies.includes(activeDateStr)) {
         completedDailies.push(activeDateStr);
@@ -476,7 +491,8 @@ function endGame(isWin) {
       checkMonthTrophy(activeDateStr);
     }
 
-    showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl.textContent}!`);
+    const timerEl = document.getElementById('timer');
+    showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl ? timerEl.textContent : ''}!`);
   } else {
     stats.losses++;
     showEndModal("❌ Game Over", "You reached 3 mistakes and lost.");
@@ -485,7 +501,6 @@ function endGame(isWin) {
   localStorage.setItem('sudoku_stats', JSON.stringify(stats));
 }
 
-// Monthly Trophy Evaluator
 function checkMonthTrophy(dateStr) {
   const [year, month] = dateStr.split('-').map(Number);
   const totalDaysInMonth = new Date(year, month, 0).getDate();
@@ -510,32 +525,32 @@ function checkMonthTrophy(dateStr) {
   }
 }
 
-/* Calendar Generator */
 function openCalendarModal() {
   playSound('click');
   renderCalendar(calViewYear, calViewMonth);
-  calendarModal.classList.add('active');
+  const calendarModal = document.getElementById('calendar-modal');
+  if (calendarModal) calendarModal.classList.add('active');
 }
 
 function renderCalendar(year, month) {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  document.getElementById('calendar-month-title').textContent = `${monthNames[month]} ${year}`;
+  const titleEl = document.getElementById('calendar-month-title');
+  if (titleEl) titleEl.textContent = `${monthNames[month]} ${year}`;
 
   const calGrid = document.getElementById('calendar-grid');
+  if (!calGrid) return;
   calGrid.innerHTML = '';
 
   const firstDayIndex = new Date(year, month, 1).getDay();
   const totalDays = new Date(year, month + 1, 0).getDate();
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  // Blank slots for previous month alignment
   for (let i = 0; i < firstDayIndex; i++) {
     const emptyDiv = document.createElement('div');
     emptyDiv.classList.add('cal-day', 'empty');
     calGrid.appendChild(emptyDiv);
   }
 
-  // Days of current month
   for (let day = 1; day <= totalDays; day++) {
     const dayBtn = document.createElement('div');
     dayBtn.classList.add('cal-day');
@@ -547,7 +562,8 @@ function renderCalendar(year, month) {
     if (dateStr === todayStr) dayBtn.classList.add('today');
 
     dayBtn.addEventListener('click', () => {
-      calendarModal.classList.remove('active');
+      const calendarModal = document.getElementById('calendar-modal');
+      if (calendarModal) calendarModal.classList.remove('active');
       startNewGame(dateStr);
     });
 
@@ -555,10 +571,10 @@ function renderCalendar(year, month) {
   }
 }
 
-/* Trophy Showcase Generator */
 function openRewardsModal() {
   playSound('click');
   const trophyGrid = document.getElementById('trophy-grid');
+  if (!trophyGrid) return;
   trophyGrid.innerHTML = '';
 
   if (rewards.length === 0) {
@@ -575,10 +591,13 @@ function openRewardsModal() {
     });
   }
 
-  rewardsModal.classList.add('active');
+  const rewardsModal = document.getElementById('rewards-modal');
+  if (rewardsModal) rewardsModal.classList.add('active');
 }
 
 function triggerConfetti() {
+  const confettiCanvas = document.getElementById('confetti-canvas');
+  if (!confettiCanvas) return;
   const ctx = confettiCanvas.getContext('2d');
   confettiCanvas.width = window.innerWidth;
   confettiCanvas.height = window.innerHeight;
@@ -609,53 +628,40 @@ function triggerConfetti() {
 }
 
 function showEndModal(title, message) {
-  document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-message').textContent = message;
-  gameModal.classList.add('active');
+  const titleEl = document.getElementById('modal-title');
+  const msgEl = document.getElementById('modal-message');
+  const gameModal = document.getElementById('game-modal');
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
+  if (gameModal) gameModal.classList.add('active');
 }
 
 function openStatsModal() {
   playSound('click');
-  document.getElementById('stat-played').textContent = stats.played;
-  document.getElementById('stat-won').textContent = stats.won;
+  const playedEl = document.getElementById('stat-played');
+  const wonEl = document.getElementById('stat-won');
+  const winrateEl = document.getElementById('stat-winrate');
+  const besttimeEl = document.getElementById('stat-besttime');
+
+  if (playedEl) playedEl.textContent = stats.played;
+  if (wonEl) wonEl.textContent = stats.won;
   
   const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
-  document.getElementById('stat-winrate').textContent = `${winRate}%`;
+  if (winrateEl) winrateEl.textContent = `${winRate}%`;
 
-  if (stats.bestTime) {
-    const mins = String(Math.floor(stats.bestTime / 60)).padStart(2, '0');
-    const secs = String(stats.bestTime % 60).padStart(2, '0');
-    document.getElementById('stat-besttime').textContent = `${mins}:${secs}`;
-  } else {
-    document.getElementById('stat-besttime').textContent = '--:--';
+  if (besttimeEl) {
+    if (stats.bestTime) {
+      const mins = String(Math.floor(stats.bestTime / 60)).padStart(2, '0');
+      const secs = String(stats.bestTime % 60).padStart(2, '0');
+      besttimeEl.textContent = `${mins}:${secs}`;
+    } else {
+      besttimeEl.textContent = '--:--';
+    }
   }
 
-  statsModal.classList.add('active');
+  const statsModal = document.getElementById('stats-modal');
+  if (statsModal) statsModal.classList.add('active');
 }
 
 function setupEventListeners() {
-  btnPause.addEventListener('click', togglePause);
-  btnNotes.addEventListener('click', toggleNotesMode);
-  document.getElementById('btn-new').addEventListener('click', () => startNewGame(null));
-  btnDaily.addEventListener('click', openCalendarModal);
-  btnRewards.addEventListener('click', openRewardsModal);
-  document.getElementById('btn-erase').addEventListener('click', eraseInput);
-  btnUndo.addEventListener('click', undoMove);
-  btnHint.addEventListener('click', giveHint);
-  document.getElementById('btn-stats').addEventListener('click', openStatsModal);
-  difficultyEl.addEventListener('change', () => startNewGame(activeDateStr));
-
-  // Calendar Controls
-  document.getElementById('cal-prev-month').addEventListener('click', () => {
-    calViewMonth--;
-    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
-    renderCalendar(calViewYear, calViewMonth);
-  });
-
-  document.getElementById('cal-next-month').addEventListener('click', () => {
-    calViewMonth++;
-    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
-    renderCalendar(calViewYear, calViewMonth);
-  });
-
-  document.getElementById('calendar-close-btn').addEve
+  const btnPause = document.getElementBy
