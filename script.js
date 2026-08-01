@@ -62,6 +62,7 @@ function startNewGame(dateStr = null) {
   updateActionButtonLabels();
   updateMistakesDisplay();
   updateTimerDisplay();
+  updateStreakDisplay();
 
   timerInterval = setInterval(() => {
     if (!isPaused) {
@@ -74,6 +75,7 @@ function startNewGame(dateStr = null) {
   historyStack = [];
   selectedCell = null;
   renderBoard();
+  updateKeypadCounts();
 }
 
 function updateActionButtonLabels() {
@@ -86,6 +88,38 @@ function updateActionButtonLabels() {
   if (btnHint) {
     btnHint.textContent = `Hint (${hintsRemaining})`;
     btnHint.disabled = hintsRemaining <= 0;
+  }
+}
+
+function calculateStreak() {
+  if (completedDailies.length === 0) return 0;
+  
+  const sorted = [...new Set(completedDailies)].sort().reverse();
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  let streak = 0;
+  let checkDate = sorted.includes(today) ? new Date() : sorted.includes(yesterday) ? new Date(Date.now() - 86400000) : null;
+
+  if (!checkDate) return 0;
+
+  while (true) {
+    const dateStr = checkDate.toISOString().slice(0, 10);
+    if (sorted.includes(dateStr)) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function updateStreakDisplay() {
+  const streakEl = document.getElementById('streak-display');
+  if (streakEl) {
+    const streak = calculateStreak();
+    streakEl.textContent = `🔥 ${streak}`;
   }
 }
 
@@ -268,9 +302,36 @@ function buildKeypad() {
   for (let i = 1; i <= 9; i++) {
     const key = document.createElement('button');
     key.classList.add('key');
-    key.textContent = i;
+    key.id = `key-${i}`;
+    key.innerHTML = `
+      <span class="key-digit">${i}</span>
+      <span class="key-badge" id="key-badge-${i}">9</span>
+    `;
     key.addEventListener('click', () => handleInput(i));
     keypadEl.appendChild(key);
+  }
+}
+
+function updateKeypadCounts() {
+  const counts = Array(10).fill(0);
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const val = currentBoard[r][c];
+      if (val !== 0 && val === solution[r][c]) {
+        counts[val]++;
+      }
+    }
+  }
+
+  for (let i = 1; i <= 9; i++) {
+    const remaining = 9 - counts[i];
+    const badge = document.getElementById(`key-badge-${i}`);
+    const keyBtn = document.getElementById(`key-${i}`);
+
+    if (badge) badge.textContent = remaining > 0 ? remaining : '✓';
+    if (keyBtn) {
+      keyBtn.classList.toggle('key-completed', remaining === 0);
+    }
   }
 }
 
@@ -312,11 +373,37 @@ function handleInput(num) {
       }
     } else {
       autoClearNotes(r, c, num);
+      checkLineCompletions(r, c);
     }
 
     renderBoard();
     selectCell(r, c);
+    updateKeypadCounts();
     checkWinCondition();
+  }
+}
+
+function checkLineCompletions(r, c) {
+  let rowComplete = true;
+  for (let col = 0; col < 9; col++) {
+    if (currentBoard[r][col] !== solution[r][col]) rowComplete = false;
+  }
+
+  let colComplete = true;
+  for (let row = 0; row < 9; row++) {
+    if (currentBoard[row][c] !== solution[row][c]) colComplete = false;
+  }
+
+  if (rowComplete || colComplete) {
+    const cells = document.querySelectorAll('.cell');
+    cells.forEach(cell => {
+      const cr = parseInt(cell.dataset.row);
+      const cc = parseInt(cell.dataset.col);
+      if ((rowComplete && cr === r) || (colComplete && cc === c)) {
+        cell.classList.add('flash-complete');
+        setTimeout(() => cell.classList.remove('flash-complete'), 600);
+      }
+    });
   }
 }
 
@@ -350,6 +437,7 @@ function eraseInput() {
     notesBoard[r][c].clear();
     renderBoard();
     selectCell(r, c);
+    updateKeypadCounts();
   }
 }
 
@@ -364,7 +452,8 @@ function undoMove() {
   updateActionButtonLabels();
 
   renderBoard();
-  selectCell(lastMove.r, lastMove.c);
+  selectCell(lastMove.r,lastMove.c);
+  updateKeypadCounts();
 }
 
 function giveHint() {
@@ -388,6 +477,7 @@ function giveHint() {
 
   renderBoard();
   selectCell(r, c);
+  updateKeypadCounts();
   checkWinCondition();
 }
 
@@ -405,6 +495,7 @@ function endGame(isWin) {
   stats.played++;
 
   if (isWin) {
+    triggerConfetti();
     stats.won++;
     if (!stats.bestTime || secondsElapsed < stats.bestTime) {
       stats.bestTime = secondsElapsed;
@@ -418,6 +509,7 @@ function endGame(isWin) {
       checkMonthTrophy(activeDateStr);
     }
 
+    updateStreakDisplay();
     const timerEl = document.getElementById('timer');
     showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl ? timerEl.textContent : ''}!`);
   } else {
@@ -426,6 +518,38 @@ function endGame(isWin) {
   }
 
   localStorage.setItem('sudoku_stats', JSON.stringify(stats));
+}
+
+function triggerConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = Array.from({ length: 70 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height - canvas.height,
+    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+    size: Math.random() * 8 + 4,
+    speedY: Math.random() * 4 + 2,
+    speedX: Math.random() * 2 - 1
+  }));
+
+  let frame = 0;
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.y += p.speedY;
+      p.x += p.speedX;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+    frame++;
+    if (frame < 140) requestAnimationFrame(render);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  render();
 }
 
 function checkMonthTrophy(dateStr) {
@@ -449,6 +573,23 @@ function checkMonthTrophy(dateStr) {
       });
       localStorage.setItem('sudoku_rewards', JSON.stringify(rewards));
     }
+  }
+}
+
+function shareResult() {
+  const timerEl = document.getElementById('timer');
+  const difficultyEl = document.getElementById('difficulty');
+  const mode = activeDateStr ? `Daily Challenge (${activeDateStr})` : `Practice (${difficultyEl ? difficultyEl.value : ''})`;
+  const streak = calculateStreak();
+
+  const shareText = `🧩 Sudoku Master Pro\n🎮 Mode: ${mode}\n⏱️ Time: ${timerEl ? timerEl.textContent : '00:00'}\n❌ Mistakes: ${mistakes}/${MAX_MISTAKES}\n🔥 Streak: ${streak} Days`;
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert("Result copied to clipboard!");
+    });
+  } else {
+    alert(shareText);
   }
 }
 
@@ -532,105 +673,4 @@ function showEndModal(title, message) {
 function openStatsModal() {
   const playedEl = document.getElementById('stat-played');
   const wonEl = document.getElementById('stat-won');
-  const winrateEl = document.getElementById('stat-winrate');
-  const besttimeEl = document.getElementById('stat-besttime');
-
-  if (playedEl) playedEl.textContent = stats.played;
-  if (wonEl) wonEl.textContent = stats.won;
-  
-  const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
-  if (winrateEl) winrateEl.textContent = `${winRate}%`;
-
-  if (besttimeEl) {
-    if (stats.bestTime) {
-      const mins = String(Math.floor(stats.bestTime / 60)).padStart(2, '0');
-      const secs = String(stats.bestTime % 60).padStart(2, '0');
-      besttimeEl.textContent = `${mins}:${secs}`;
-    } else {
-      besttimeEl.textContent = '--:--';
-    }
-  }
-
-  const statsModal = document.getElementById('stats-modal');
-  if (statsModal) statsModal.classList.add('active');
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  buildKeypad();
-  startNewGame(null);
-
-  const btnPause = document.getElementById('btn-pause');
-  const btnNotes = document.getElementById('btn-notes');
-  const btnNew = document.getElementById('btn-new');
-  const btnDaily = document.getElementById('btn-daily');
-  const btnRewards = document.getElementById('btn-rewards');
-  const btnErase = document.getElementById('btn-erase');
-  const btnUndo = document.getElementById('btn-undo');
-  const btnHint = document.getElementById('btn-hint');
-  const btnStats = document.getElementById('btn-stats');
-  const difficultyEl = document.getElementById('difficulty');
-  const themeToggle = document.getElementById('theme-toggle');
-
-  if (btnPause) btnPause.addEventListener('click', togglePause);
-  if (btnNotes) btnNotes.addEventListener('click', toggleNotesMode);
-  if (btnNew) btnNew.addEventListener('click', () => startNewGame(null));
-  if (btnDaily) btnDaily.addEventListener('click', openCalendarModal);
-  if (btnRewards) btnRewards.addEventListener('click', openRewardsModal);
-  if (btnErase) btnErase.addEventListener('click', eraseInput);
-  if (btnUndo) btnUndo.addEventListener('click', undoMove);
-  if (btnHint) btnHint.addEventListener('click', giveHint);
-  if (btnStats) btnStats.addEventListener('click', openStatsModal);
-  if (difficultyEl) difficultyEl.addEventListener('change', () => startNewGame(activeDateStr));
-
-  const calPrev = document.getElementById('cal-prev-month');
-  const calNext = document.getElementById('cal-next-month');
-  const calClose = document.getElementById('calendar-close-btn');
-  const rewardsClose = document.getElementById('rewards-close-btn');
-  const modalClose = document.getElementById('modal-close-btn');
-  const statsClose = document.getElementById('stats-close-btn');
-
-  if (calPrev) calPrev.addEventListener('click', () => {
-    calViewMonth--;
-    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
-    renderCalendar(calViewYear, calViewMonth);
-  });
-
-  if (calNext) calNext.addEventListener('click', () => {
-    calViewMonth++;
-    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
-    renderCalendar(calViewYear, calViewMonth);
-  });
-
-  if (calClose) calClose.addEventListener('click', () => {
-    const calendarModal = document.getElementById('calendar-modal');
-    if (calendarModal) calendarModal.classList.remove('active');
-  });
-
-  if (rewardsClose) rewardsClose.addEventListener('click', () => {
-    const rewardsModal = document.getElementById('rewards-modal');
-    if (rewardsModal) rewardsModal.classList.remove('active');
-  });
-
-  if (modalClose) modalClose.addEventListener('click', () => {
-    const gameModal = document.getElementById('game-modal');
-    if (gameModal) gameModal.classList.remove('active');
-    startNewGame(null);
-  });
-
-  if (statsClose) statsClose.addEventListener('click', () => {
-    const statsModal = document.getElementById('stats-modal');
-    if (statsModal) statsModal.classList.remove('active');
-  });
-
-  if (themeToggle) themeToggle.addEventListener('click', () => {
-    const isDark = document.body.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-      document.body.removeAttribute('data-theme');
-      themeToggle.textContent = '🌙 Dark';
-    } else {
-      document.body.setAttribute('data-theme', 'dark');
-      themeToggle.textContent = '☀️ Light';
-    }
-  });
-});
-  
+  const winrateEl = document.getElem
