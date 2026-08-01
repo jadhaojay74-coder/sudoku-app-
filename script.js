@@ -10,6 +10,7 @@ let secondsElapsed = 0;
 let mistakes = 0;
 let isPaused = false;
 let isNotesMode = false;
+let isZenMode = false;
 let activeDateStr = null;
 const MAX_MISTAKES = 3;
 
@@ -26,13 +27,28 @@ let stats = JSON.parse(localStorage.getItem('sudoku_stats')) || {
 let completedDailies = JSON.parse(localStorage.getItem('sudoku_completed_dailies')) || [];
 let rewards = JSON.parse(localStorage.getItem('sudoku_rewards')) || [];
 
-function startNewGame(dateStr = null) {
+function startNewGame(dateStr = null, loadSaved = false) {
   if (timerInterval) clearInterval(timerInterval);
-  secondsElapsed = 0;
-  mistakes = 0;
-  isPaused = false;
-  isNotesMode = false;
-  activeDateStr = dateStr;
+  
+  if (loadSaved && loadGameState()) {
+    // Game restored from localStorage
+  } else {
+    secondsElapsed = 0;
+    mistakes = 0;
+    isPaused = false;
+    isNotesMode = false;
+    activeDateStr = dateStr;
+
+    const difficultyEl = document.getElementById('difficulty');
+    const diff = difficultyEl ? difficultyEl.value : 'medium';
+    
+    if (diff === 'easy') { hintsRemaining = 3; undosRemaining = 3; }
+    else if (diff === 'medium') { hintsRemaining = 2; undosRemaining = 2; }
+    else { hintsRemaining = 1; undosRemaining = 1; }
+
+    generateSudoku(activeDateStr);
+    historyStack = [];
+  }
 
   const gameModeBanner = document.getElementById('game-mode-banner');
   if (gameModeBanner) {
@@ -52,30 +68,115 @@ function startNewGame(dateStr = null) {
   if (boardEl) boardEl.classList.remove('paused');
   if (pauseOverlay) pauseOverlay.classList.remove('active');
 
-  const difficultyEl = document.getElementById('difficulty');
-  const diff = difficultyEl ? difficultyEl.value : 'medium';
-  
-  if (diff === 'easy') { hintsRemaining = 3; undosRemaining = 3; }
-  else if (diff === 'medium') { hintsRemaining = 2; undosRemaining = 2; }
-  else { hintsRemaining = 1; undosRemaining = 1; }
-
   updateActionButtonLabels();
   updateMistakesDisplay();
   updateTimerDisplay();
   updateStreakDisplay();
 
   timerInterval = setInterval(() => {
-    if (!isPaused) {
+    if (!isPaused && !isZenMode) {
       secondsElapsed++;
       updateTimerDisplay();
+      saveGameState();
     }
   }, 1000);
 
-  generateSudoku(activeDateStr);
-  historyStack = [];
   selectedCell = null;
   renderBoard();
   updateKeypadCounts();
+  saveGameState();
+}
+
+function triggerHaptic(type = 'light') {
+  if (navigator.vibrate) {
+    if (type === 'light') navigator.vibrate(12);
+    else if (type === 'error') navigator.vibrate([40, 60, 40]);
+  }
+}
+
+function saveGameState() {
+  const gameState = {
+    solution, initialBoard, currentBoard,
+    notesBoard: notesBoard.map(row => row.map(set => Array.from(set))),
+    secondsElapsed, mistakes, activeDateStr, hintsRemaining, undosRemaining, isZenMode
+  };
+  localStorage.setItem('sudoku_saved_state', JSON.stringify(gameState));
+}
+
+function loadGameState() {
+  const saved = localStorage.getItem('sudoku_saved_state');
+  if (!saved) return false;
+  try {
+    const data = JSON.parse(saved);
+    solution = data.solution;
+    initialBoard = data.initialBoard;
+    currentBoard = data.currentBoard;
+    notesBoard = data.notesBoard.map(row => row.map(arr => new Set(arr)));
+    secondsElapsed = data.secondsElapsed;
+    mistakes = data.mistakes;
+    activeDateStr = data.activeDateStr;
+    hintsRemaining = data.hintsRemaining;
+    undosRemaining = data.undosRemaining;
+    isZenMode = !!data.isZenMode;
+    applyZenModeUI();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function toggleZenMode() {
+  isZenMode = !isZenMode;
+  applyZenModeUI();
+  saveGameState();
+}
+
+function applyZenModeUI() {
+  const btnZen = document.getElementById('btn-zen');
+  const timerWrp = document.getElementById('timer-wrapper');
+  const mistakeWrp = document.getElementById('mistakes-wrapper');
+
+  if (btnZen) {
+    btnZen.textContent = `🧘 Zen (${isZenMode ? 'ON' : 'OFF'})`;
+    btnZen.classList.toggle('btn-active-mode', isZenMode);
+  }
+  if (timerWrp) timerWrp.style.display = isZenMode ? 'none' : 'flex';
+  if (mistakeWrp) mistakeWrp.style.display = isZenMode ? 'none' : 'flex';
+}
+
+function autoFillNotes() {
+  if (isPaused) return;
+  triggerHaptic('light');
+
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (currentBoard[r][c] === 0) {
+        notesBoard[r][c].clear();
+        for (let num = 1; num <= 9; num++) {
+          if (isValidPlacement(r, c, num)) {
+            notesBoard[r][c].add(num);
+          }
+        }
+      }
+    }
+  }
+  renderBoard();
+  if (selectedCell) selectCell(selectedCell.r, selectedCell.c);
+  saveGameState();
+}
+
+function isValidPlacement(r, c, num) {
+  for (let i = 0; i < 9; i++) {
+    if (currentBoard[r][i] === num || currentBoard[i][c] === num) return false;
+  }
+  const boxR = Math.floor(r / 3) * 3;
+  const boxC = Math.floor(c / 3) * 3;
+  for (let br = 0; br < 3; br++) {
+    for (let bc = 0; bc < 3; bc++) {
+      if (currentBoard[boxR + br][boxC + bc] === num) return false;
+    }
+  }
+  return true;
 }
 
 function updateActionButtonLabels() {
@@ -93,7 +194,6 @@ function updateActionButtonLabels() {
 
 function calculateStreak() {
   if (completedDailies.length === 0) return 0;
-  
   const sorted = [...new Set(completedDailies)].sort().reverse();
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -247,7 +347,7 @@ function renderBoard() {
           cell.classList.add('given');
         } else {
           cell.classList.add('user-input');
-          if (val !== solution[r][c]) {
+          if (val !== solution[r][c] && !isZenMode) {
             cell.classList.add('error');
           }
         }
@@ -273,6 +373,7 @@ function renderBoard() {
 
 function selectCell(r, c) {
   selectedCell = { r, c };
+  triggerHaptic('light');
   const cells = document.querySelectorAll('.cell');
   const selectedVal = currentBoard[r][c];
 
@@ -343,6 +444,7 @@ function handleInput(num) {
 
   if (isNotesMode) {
     if (currentBoard[r][c] === 0) {
+      triggerHaptic('light');
       if (notesBoard[r][c].has(num)) {
         notesBoard[r][c].delete(num);
       } else {
@@ -350,6 +452,7 @@ function handleInput(num) {
       }
       renderBoard();
       selectCell(r, c);
+      saveGameState();
     }
     return;
   }
@@ -365,13 +468,17 @@ function handleInput(num) {
     notesBoard[r][c].clear();
 
     if (num !== solution[r][c]) {
-      mistakes++;
-      updateMistakesDisplay();
-      if (mistakes >= MAX_MISTAKES) {
-        endGame(false);
-        return;
+      triggerHaptic('error');
+      if (!isZenMode) {
+        mistakes++;
+        updateMistakesDisplay();
+        if (mistakes >= MAX_MISTAKES) {
+          endGame(false);
+          return;
+        }
       }
     } else {
+      triggerHaptic('light');
       autoClearNotes(r, c, num);
       checkLineCompletions(r, c);
     }
@@ -379,6 +486,7 @@ function handleInput(num) {
     renderBoard();
     selectCell(r, c);
     updateKeypadCounts();
+    saveGameState();
     checkWinCondition();
   }
 }
@@ -428,6 +536,7 @@ function eraseInput() {
   if (initialBoard[r][c] !== 0) return;
 
   if (currentBoard[r][c] !== 0 || notesBoard[r][c].size > 0) {
+    triggerHaptic('light');
     historyStack.push({ 
       r, c, 
       prevVal: currentBoard[r][c],
@@ -438,12 +547,14 @@ function eraseInput() {
     renderBoard();
     selectCell(r, c);
     updateKeypadCounts();
+    saveGameState();
   }
 }
 
 function undoMove() {
   if (isPaused || historyStack.length === 0 || undosRemaining <= 0) return;
 
+  triggerHaptic('light');
   const lastMove = historyStack.pop();
   currentBoard[lastMove.r][lastMove.c] = lastMove.prevVal;
   notesBoard[lastMove.r][lastMove.c] = lastMove.prevNotes;
@@ -452,8 +563,9 @@ function undoMove() {
   updateActionButtonLabels();
 
   renderBoard();
-  selectCell(lastMove.r,lastMove.c);
+  selectCell(lastMove.r, lastMove.c);
   updateKeypadCounts();
+  saveGameState();
 }
 
 function giveHint() {
@@ -462,6 +574,7 @@ function giveHint() {
 
   if (initialBoard[r][c] !== 0 || currentBoard[r][c] === solution[r][c]) return;
 
+  triggerHaptic('light');
   historyStack.push({ 
     r, c, 
     prevVal: currentBoard[r][c],
@@ -478,6 +591,7 @@ function giveHint() {
   renderBoard();
   selectCell(r, c);
   updateKeypadCounts();
+  saveGameState();
   checkWinCondition();
 }
 
@@ -493,6 +607,7 @@ function checkWinCondition() {
 function endGame(isWin) {
   if (timerInterval) clearInterval(timerInterval);
   stats.played++;
+  localStorage.removeItem('sudoku_saved_state');
 
   if (isWin) {
     triggerConfetti();
@@ -511,7 +626,7 @@ function endGame(isWin) {
 
     updateStreakDisplay();
     const timerEl = document.getElementById('timer');
-    showEndModal("🎉 Victory!", `You solved the puzzle in ${timerEl ? timerEl.textContent : ''}!`);
+    showEndModal("🎉 Victory!", isZenMode ? "You successfully completed the puzzle!" : `You solved the puzzle in ${timerEl ? timerEl.textContent : ''}!`);
   } else {
     stats.losses++;
     showEndModal("❌ Game Over", "You reached 3 mistakes and lost.");
@@ -582,95 +697,4 @@ function shareResult() {
   const mode = activeDateStr ? `Daily Challenge (${activeDateStr})` : `Practice (${difficultyEl ? difficultyEl.value : ''})`;
   const streak = calculateStreak();
 
-  const shareText = `🧩 Sudoku Master Pro\n🎮 Mode: ${mode}\n⏱️ Time: ${timerEl ? timerEl.textContent : '00:00'}\n❌ Mistakes: ${mistakes}/${MAX_MISTAKES}\n🔥 Streak: ${streak} Days`;
-
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(shareText).then(() => {
-      alert("Result copied to clipboard!");
-    });
-  } else {
-    alert(shareText);
-  }
-}
-
-function openCalendarModal() {
-  renderCalendar(calViewYear, calViewMonth);
-  const calendarModal = document.getElementById('calendar-modal');
-  if (calendarModal) calendarModal.classList.add('active');
-}
-
-function renderCalendar(year, month) {
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const titleEl = document.getElementById('calendar-month-title');
-  if (titleEl) titleEl.textContent = `${monthNames[month]} ${year}`;
-
-  const calGrid = document.getElementById('calendar-grid');
-  if (!calGrid) return;
-  calGrid.innerHTML = '';
-
-  const firstDayIndex = new Date(year, month, 1).getDay();
-  const totalDays = new Date(year, month + 1, 0).getDate();
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  for (let i = 0; i < firstDayIndex; i++) {
-    const emptyDiv = document.createElement('div');
-    emptyDiv.classList.add('cal-day', 'empty');
-    calGrid.appendChild(emptyDiv);
-  }
-
-  for (let day = 1; day <= totalDays; day++) {
-    const dayBtn = document.createElement('div');
-    dayBtn.classList.add('cal-day');
-    dayBtn.textContent = day;
-
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-    if (completedDailies.includes(dateStr)) dayBtn.classList.add('completed');
-    if (dateStr === todayStr) dayBtn.classList.add('today');
-
-    dayBtn.addEventListener('click', () => {
-      const calendarModal = document.getElementById('calendar-modal');
-      if (calendarModal) calendarModal.classList.remove('active');
-      startNewGame(dateStr);
-    });
-
-    calGrid.appendChild(dayBtn);
-  }
-}
-
-function openRewardsModal() {
-  const trophyGrid = document.getElementById('trophy-grid');
-  if (!trophyGrid) return;
-  trophyGrid.innerHTML = '';
-
-  if (rewards.length === 0) {
-    trophyGrid.innerHTML = `<p style="grid-column: span 2; opacity:0.6;">No trophies earned yet.<br>Complete all days in a month to unlock one!</p>`;
-  } else {
-    rewards.forEach(reward => {
-      const card = document.createElement('div');
-      card.classList.add('trophy-card');
-      card.innerHTML = `
-        <div class="trophy-icon">${reward.icon}</div>
-        <div class="trophy-title">${reward.title}</div>
-      `;
-      trophyGrid.appendChild(card);
-    });
-  }
-
-  const rewardsModal = document.getElementById('rewards-modal');
-  if (rewardsModal) rewardsModal.classList.add('active');
-}
-
-function showEndModal(title, message) {
-  const titleEl = document.getElementById('modal-title');
-  const msgEl = document.getElementById('modal-message');
-  const gameModal = document.getElementById('game-modal');
-  if (titleEl) titleEl.textContent = title;
-  if (msgEl) msgEl.textContent = message;
-  if (gameModal) gameModal.classList.add('active');
-}
-
-function openStatsModal() {
-  const playedEl = document.getElementById('stat-played');
-  const wonEl = document.getElementById('stat-won');
-  const winrateEl = document.getElem
+  const shareTe
