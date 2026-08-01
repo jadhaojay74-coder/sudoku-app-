@@ -61,7 +61,7 @@ body {
   padding: 16px;
   border-radius: 16px;
   box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-  max-width: 460px;
+  max-width: 480px;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -241,8 +241,8 @@ select {
 
 .action-buttons {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
   width: 100%;
   margin-bottom: 12px;
 }
@@ -415,3 +415,4 @@ select {
   margin-top: 12px;
 }
 .modal-action-row .btn { flex: 1; padding: 10px; }
+  
