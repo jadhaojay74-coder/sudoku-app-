@@ -1,0 +1,5 @@
+User-agent: *
+
+Allow: /
+
+Sitemap: https://jadhaojay74-coder.github.io/sudoku-app-/sitemap.xml
