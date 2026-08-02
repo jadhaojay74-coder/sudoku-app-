@@ -412,15 +412,16 @@ function selectCell(r, c) {
     const cr = parseInt(cell.dataset.row);
     const cc = parseInt(cell.dataset.col);
 
-    cell.classList.remove('selected', 'highlight');
+    cell.classList.remove('selected', 'highlight', 'same-digit');
 
     if (cr === r && cc === c) {
       cell.classList.add('selected');
+    } else if (selectedVal !== 0 && currentBoard[cr][cc] === selectedVal) {
+      cell.classList.add('same-digit');
     } else if (
       cr === r || 
       cc === c || 
-      (Math.floor(cr / 3) === Math.floor(r / 3) && Math.floor(cc / 3) === Math.floor(c / 3)) ||
-      (selectedVal !== 0 && currentBoard[cr][cc] === selectedVal)
+      (Math.floor(cr / 3) === Math.floor(r / 3) && Math.floor(cc / 3) === Math.floor(c / 3))
     ) {
       cell.classList.add('highlight');
     }
@@ -693,4 +694,264 @@ function triggerConfetti() {
       p.y += p.speedY;
       p.x += p.speedX;
       ctx.fillStyle = p.color;
-      ctx.fillR
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+    frame++;
+    if (frame < 140) requestAnimationFrame(render);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  render();
+}
+
+function checkMonthTrophy(dateStr) {
+  const [year, month] = dateStr.split('-').map(Number);
+  const totalDaysInMonth = new Date(year, month, 0).getDate();
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+
+  let daysCompleted = 0;
+  for (let d = 1; d <= totalDaysInMonth; d++) {
+    const checkDateStr = `${monthKey}-${String(d).padStart(2, '0')}`;
+    if (completedDailies.includes(checkDateStr)) daysCompleted++;
+  }
+
+  if (daysCompleted >= totalDaysInMonth) {
+    if (!rewards.some(r => r.monthKey === monthKey)) {
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      rewards.push({
+        monthKey: monthKey,
+        title: `${monthNames[month - 1]} ${year}`,
+        icon: "🏆"
+      });
+      localStorage.setItem('sudoku_rewards', JSON.stringify(rewards));
+    }
+  }
+}
+
+function shareResult() {
+  const timerEl = document.getElementById('timer');
+  const difficultyEl = document.getElementById('difficulty');
+  const mode = activeDateStr ? `Daily Challenge (${activeDateStr})` : `Practice (${difficultyEl ? difficultyEl.value : ''})`;
+  const streak = calculateStreak();
+
+  const shareText = `🧩 Sudoku Master Pro\n🎮 Mode: ${mode}\n⏱️ Time: ${isZenMode ? 'Zen Mode' : (timerEl ? timerEl.textContent : '00:00')}\n❌ Mistakes: ${isZenMode ? 'Disabled' : `${mistakes}/${MAX_MISTAKES}`}\n🔥 Streak: ${streak} Days`;
+
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(shareText).then(() => {
+      alert("Result copied to clipboard!");
+    });
+  } else {
+    alert(shareText);
+  }
+}
+
+function openCalendarModal() {
+  renderCalendar(calViewYear, calViewMonth);
+  const calendarModal = document.getElementById('calendar-modal');
+  if (calendarModal) calendarModal.classList.add('active');
+}
+
+function renderCalendar(year, month) {
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const titleEl = document.getElementById('calendar-month-title');
+  if (titleEl) titleEl.textContent = `${monthNames[month]} ${year}`;
+
+  const calGrid = document.getElementById('calendar-grid');
+  if (!calGrid) return;
+  calGrid.innerHTML = '';
+
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  for (let i = 0; i < firstDayIndex; i++) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.classList.add('cal-day', 'empty');
+    calGrid.appendChild(emptyDiv);
+  }
+
+  for (let day = 1; day <= totalDays; day++) {
+    const dayBtn = document.createElement('div');
+    dayBtn.classList.add('cal-day');
+    dayBtn.textContent = day;
+
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    if (completedDailies.includes(dateStr)) dayBtn.classList.add('completed');
+    if (dateStr === todayStr) dayBtn.classList.add('today');
+
+    dayBtn.addEventListener('click', () => {
+      const calendarModal = document.getElementById('calendar-modal');
+      if (calendarModal) calendarModal.classList.remove('active');
+      startNewGame(dateStr);
+    });
+
+    calGrid.appendChild(dayBtn);
+  }
+}
+
+function openRewardsModal() {
+  const trophyGrid = document.getElementById('trophy-grid');
+  if (!trophyGrid) return;
+  trophyGrid.innerHTML = '';
+
+  if (rewards.length === 0) {
+    trophyGrid.innerHTML = `<p style="grid-column: span 2; opacity:0.6;">No trophies earned yet.<br>Complete all days in a month to unlock one!</p>`;
+  } else {
+    rewards.forEach(reward => {
+      const card = document.createElement('div');
+      card.classList.add('trophy-card');
+      card.innerHTML = `
+        <div class="trophy-icon">${reward.icon}</div>
+        <div class="trophy-title">${reward.title}</div>
+      `;
+      trophyGrid.appendChild(card);
+    });
+  }
+
+  const rewardsModal = document.getElementById('rewards-modal');
+  if (rewardsModal) rewardsModal.classList.add('active');
+}
+
+function showEndModal(title, message) {
+  const titleEl = document.getElementById('modal-title');
+  const msgEl = document.getElementById('modal-message');
+  const gameModal = document.getElementById('game-modal');
+  if (titleEl) titleEl.textContent = title;
+  if (msgEl) msgEl.textContent = message;
+  if (gameModal) gameModal.classList.add('active');
+}
+
+function openStatsModal() {
+  const playedEl = document.getElementById('stat-played');
+  const wonEl = document.getElementById('stat-won');
+  const winrateEl = document.getElementById('stat-winrate');
+  const besttimeEl = document.getElementById('stat-besttime');
+
+  if (playedEl) playedEl.textContent = stats.played;
+  if (wonEl) wonEl.textContent = stats.won;
+  
+  const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
+  if (winrateEl) winrateEl.textContent = `${winRate}%`;
+
+  if (besttimeEl) {
+    if (stats.bestTime) {
+      const mins = String(Math.floor(stats.bestTime / 60)).padStart(2, '0');
+      const secs = String(stats.bestTime % 60).padStart(2, '0');
+      besttimeEl.textContent = `${mins}:${secs}`;
+    } else {
+      besttimeEl.textContent = '--:--';
+    }
+  }
+
+  const statsModal = document.getElementById('stats-modal');
+  if (statsModal) statsModal.classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildKeypad();
+  startNewGame(null, true);
+
+  const btnPause = document.getElementById('btn-pause');
+  const btnNotes = document.getElementById('btn-notes');
+  const btnAutoNotes = document.getElementById('btn-auto-notes');
+  const btnZen = document.getElementById('btn-zen');
+  const btnNew = document.getElementById('btn-new');
+  const btnDaily = document.getElementById('btn-daily');
+  const btnRewards = document.getElementById('btn-rewards');
+  const btnErase = document.getElementById('btn-erase');
+  const btnUndo = document.getElementById('btn-undo');
+  const btnHint = document.getElementById('btn-hint');
+  const btnStats = document.getElementById('btn-stats');
+  const difficultyEl = document.getElementById('difficulty');
+  const themeToggle = document.getElementById('theme-toggle');
+
+  if (btnPause) btnPause.addEventListener('click', togglePause);
+  if (btnNotes) btnNotes.addEventListener('click', toggleNotesMode);
+  if (btnAutoNotes) btnAutoNotes.addEventListener('click', autoFillNotes);
+  if (btnZen) btnZen.addEventListener('click', toggleZenMode);
+  if (btnNew) btnNew.addEventListener('click', () => startNewGame(null));
+  if (btnDaily) btnDaily.addEventListener('click', openCalendarModal);
+  if (btnRewards) btnRewards.addEventListener('click', openRewardsModal);
+  if (btnErase) btnErase.addEventListener('click', eraseInput);
+  if (btnUndo) btnUndo.addEventListener('click', undoMove);
+  if (btnHint) btnHint.addEventListener('click', giveHint);
+  if (btnStats) btnStats.addEventListener('click', openStatsModal);
+  if (difficultyEl) difficultyEl.addEventListener('change', () => startNewGame(activeDateStr));
+
+  const calPrev = document.getElementById('cal-prev-month');
+  const calNext = document.getElementById('cal-next-month');
+  const calClose = document.getElementById('calendar-close-btn');
+  const rewardsClose = document.getElementById('rewards-close-btn');
+  const modalClose = document.getElementById('modal-close-btn');
+  const shareBtn = document.getElementById('modal-share-btn');
+  const statsClose = document.getElementById('stats-close-btn');
+
+  if (calPrev) calPrev.addEventListener('click', () => {
+    calViewMonth--;
+    if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+    renderCalendar(calViewYear, calViewMonth);
+  });
+
+  if (calNext) calNext.addEventListener('click', () => {
+    calViewMonth++;
+    if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+    renderCalendar(calViewYear, calViewMonth);
+  });
+
+  if (calClose) calClose.addEventListener('click', () => {
+    const calendarModal = document.getElementById('calendar-modal');
+    if (calendarModal) calendarModal.classList.remove('active');
+  });
+
+  if (rewardsClose) rewardsClose.addEventListener('click', () => {
+    const rewardsModal = document.getElementById('rewards-modal');
+    if (rewardsModal) rewardsModal.classList.remove('active');
+  });
+
+  if (modalClose) modalClose.addEventListener('click', () => {
+    const gameModal = document.getElementById('game-modal');
+    if (gameModal) gameModal.classList.remove('active');
+    startNewGame(null);
+  });
+
+  if (shareBtn) shareBtn.addEventListener('click', shareResult);
+
+  if (statsClose) statsClose.addEventListener('click', () => {
+    const statsModal = document.getElementById('stats-modal');
+    if (statsModal) statsModal.classList.remove('active');
+  });
+
+  if (themeToggle) themeToggle.addEventListener('click', () => {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      document.body.removeAttribute('data-theme');
+      themeToggle.textContent = '🌙 Dark';
+    } else {
+      document.body.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = '☀️ Light';
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (isPaused) return;
+    if (e.key >= '1' && e.key <= '9') {
+      handleInput(parseInt(e.key));
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+      eraseInput();
+    } else if (e.key.toLowerCase() === 'n') {
+      toggleNotesMode();
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      togglePause();
+    } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      let r = selectedCell ? selectedCell.r : 0;
+      let c = selectedCell ? selectedCell.c : 0;
+      if (e.key === 'ArrowUp') r = (r - 1 + 9) % 9;
+      if (e.key === 'ArrowDown') r = (r + 1) % 9;
+      if (e.key === 'ArrowLeft') c = (c - 1 + 9) % 9;
+      if (e.key === 'ArrowRight') c = (c + 1) % 9;
+      selectCell(r, c);
+    }
+  });
+});
