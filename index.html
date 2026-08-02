@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sudoku Master Pro</title>
+  <title>Sudoku Master Ultimate & Multiplayer</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 
@@ -12,22 +13,34 @@
 
 <div class="container">
   <header>
-    <h1>Sudoku</h1>
+    <h1>Sudoku Master</h1>
     <div class="header-actions">
       <span class="streak-badge" id="streak-display">🔥 0</span>
       <button class="theme-btn" id="theme-toggle">🌙 Dark</button>
     </div>
   </header>
 
-  <div class="status-bar" id="status-bar">
+  <div class="status-bar">
     <div class="status-item">
-      <span>Mode:</span>
+      <span>Variant:</span>
+      <select id="variant-select">
+        <option value="classic">Classic 9x9</option>
+        <option value="diagonal">Sudoku X (Diagonal)</option>
+        <option value="mini">Mini 6x6</option>
+        <option value="hyper">Hyper (Windoku)</option>
+      </select>
+    </div>
+    <div class="status-item">
+      <span>Diff:</span>
       <select id="difficulty">
         <option value="easy">Easy</option>
         <option value="medium" selected>Medium</option>
         <option value="hard">Hard</option>
       </select>
     </div>
+  </div>
+
+  <div class="status-bar">
     <div class="status-item" id="mistakes-wrapper">
       <span>Mistakes:</span>
       <strong id="mistakes-count" class="mistake-text">0/3</strong>
@@ -35,6 +48,17 @@
     <div class="status-item" id="timer-wrapper">
       <span>Time:</span>
       <strong id="timer">00:00</strong>
+    </div>
+  </div>
+
+  <div class="multiplayer-bar" id="multiplayer-bar" style="display: none;">
+    <div class="p-tracker">
+      <span>You: <strong id="my-progress">0%</strong></span>
+      <div class="p-bar-bg"><div class="p-bar-fill" id="my-bar" style="width:0%"></div></div>
+    </div>
+    <div class="p-tracker">
+      <span>Opponent: <strong id="opp-progress">0%</strong></span>
+      <div class="p-bar-bg"><div class="p-bar-fill opp" id="opp-bar" style="width:0%"></div></div>
     </div>
   </div>
 
@@ -52,71 +76,66 @@
     <button class="btn" id="btn-undo">Undo (2)</button>
     <button class="btn" id="btn-hint">Hint (2)</button>
     <button class="btn" id="btn-erase">Erase</button>
-    <button class="btn" id="btn-zen">🧘 Zen (OFF)</button>
+    <button class="btn" id="btn-zen">🧘 Zen Mode</button>
+    <button class="btn btn-multi" id="btn-multiplayer">⚔️ 1v1 Race</button>
     <button class="btn btn-secondary" id="btn-daily">Calendar</button>
-    <button class="btn btn-secondary" id="btn-rewards">Rewards</button>
     <button class="btn btn-secondary" id="btn-stats">Stats</button>
-    <button class="btn btn-secondary" id="btn-new">New</button>
+    <button class="btn btn-secondary" id="btn-new">New Game</button>
   </div>
 
   <div class="keypad" id="keypad"></div>
 </div>
 
-<div class="modal-overlay" id="calendar-modal">
-  <div class="modal-content calendar-modal-content">
-    <div class="calendar-header">
-      <button class="btn btn-secondary" id="cal-prev-month">&lt;</button>
-      <h3 id="calendar-month-title">Calendar</h3>
-      <button class="btn btn-secondary" id="cal-next-month">&gt;</button>
-    </div>
-    <div class="calendar-weekdays">
-      <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-    </div>
-    <div class="calendar-grid" id="calendar-grid"></div>
-    <button class="btn modal-btn" id="calendar-close-btn">Close</button>
-  </div>
-</div>
-
-<div class="modal-overlay" id="rewards-modal">
+<div class="modal-overlay" id="mp-modal">
   <div class="modal-content">
-    <h2>🏆 Trophy Room</h2>
-    <p class="rewards-subtitle">Complete all daily challenges in a month to earn a trophy!</p>
-    <div class="trophy-grid" id="trophy-grid"></div>
-    <button class="btn modal-btn" id="rewards-close-btn">Close</button>
+    <h2>⚔️ 1v1 Live Race</h2>
+    <p style="font-size: 0.85rem; opacity: 0.8;">Race a friend to see who solves the same puzzle first!</p>
+    
+    <div class="mp-box">
+      <h4>Create Room</h4>
+      <p style="font-size:0.75rem;">Your Room Code:</p>
+      <div class="code-display" id="my-peer-id">Generating...</div>
+      <button class="btn" id="btn-copy-code">📋 Copy Code</button>
+    </div>
+
+    <hr class="modal-divider">
+
+    <div class="mp-box">
+      <h4>Join Room</h4>
+      <input type="text" id="join-room-input" placeholder="Enter Room Code..." class="mp-input">
+      <button class="btn btn-secondary" id="btn-join-room" style="margin-top: 6px;">Connect & Race</button>
+    </div>
+
+    <button class="btn modal-btn" id="mp-close-btn">Cancel</button>
   </div>
 </div>
 
 <div class="modal-overlay" id="game-modal">
   <div class="modal-content">
     <h2 id="modal-title">Game Over</h2>
-    <p id="modal-message">You reached 3 mistakes!</p>
-    <div class="modal-action-row">
-      <button class="btn btn-secondary" id="modal-share-btn">📋 Share Result</button>
-      <button class="btn modal-btn" id="modal-close-btn">Play Again</button>
+    <p id="modal-message">Result text here</p>
+    <button class="btn modal-btn" id="modal-close-btn">Play Again</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="calendar-modal">
+  <div class="modal-content">
+    <div class="calendar-header">
+      <button class="btn btn-secondary" id="cal-prev-month">&lt;</button>
+      <h3 id="calendar-month-title">Calendar</h3>
+      <button class="btn btn-secondary" id="cal-next-month">&gt;</button>
     </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+    <button class="btn modal-btn" id="calendar-close-btn">Close</button>
   </div>
 </div>
 
 <div class="modal-overlay" id="stats-modal">
   <div class="modal-content">
-    <h2>Performance Analysis</h2>
+    <h2>Statistics</h2>
     <div class="stats-grid">
-      <div class="stat-card">
-        <span class="stat-number" id="stat-played">0</span>
-        <span class="stat-label">Played</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-number" id="stat-won">0</span>
-        <span class="stat-label">Won</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-number" id="stat-winrate">0%</span>
-        <span class="stat-label">Win Rate</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-number" id="stat-besttime">--:--</span>
-        <span class="stat-label">Best Time</span>
-      </div>
+      <div class="stat-card"><span class="stat-number" id="stat-played">0</span><span class="stat-label">Played</span></div>
+      <div class="stat-card"><span class="stat-number" id="stat-won">0</span><span class="stat-label">Won</span></div>
     </div>
     <button class="btn modal-btn" id="stats-close-btn">Close</button>
   </div>
