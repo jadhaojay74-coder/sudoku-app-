@@ -32,7 +32,7 @@ let currentBoard = [];
 let initialMask = [];
 let cellNotes = [];
 
-// Dynamic Web Audio Synthesizer
+// Web Audio Synthesizer
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 function playSound(type) {
@@ -84,16 +84,8 @@ function triggerVibrate(ms = 30) {
   }
 }
 
-// App Initialization
-document.addEventListener('DOMContentLoaded', () => {
-  setupKeyboardListeners();
-  if (!loadGameState()) {
-    startNewGame();
-  }
-});
-
-// Fixed Tab Switcher with Instant Chart Redraw
-function switchTab(tabId, btn) {
+// Global Tab Switcher
+window.switchTab = function(tabId, btn) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   
@@ -101,33 +93,30 @@ function switchTab(tabId, btn) {
   if (targetView) targetView.classList.add('active');
   if (btn) btn.classList.add('active');
 
-  // When switching to Status tab, force Chart.js to initialize/re-evaluate dimensions
   if (tabId === 'status-view' || tabId === 'status-tab') {
     setTimeout(() => {
       renderOrUpdateChart();
-    }, 50);
+    }, 100);
   }
-}
+};
 
-function toggleTheme() {
+window.toggleTheme = function() {
   const current = document.body.getAttribute('data-theme');
   const next = current === 'dark' ? 'light' : 'dark';
   document.body.setAttribute('data-theme', next);
   const themeBtn = document.getElementById('theme-btn');
   if (themeBtn) themeBtn.innerText = next === 'dark' ? '☀️ Light' : '🌙 Dark';
   saveGameState();
-}
+};
 
-function toggleSoundSetting(val) { soundEnabled = val; saveGameState(); }
-function toggleVibeSetting(val) { vibeEnabled = val; saveGameState(); }
-
-function changeGridMode() {
-  const mode = document.getElementById('grid-size').value;
+window.changeGridMode = function() {
+  const modeSelect = document.getElementById('grid-size');
+  const mode = modeSelect ? modeSelect.value : '9x9';
   gridDimension = mode === '3x3' ? 3 : 9;
   startNewGame();
-}
+};
 
-function startNewGame() {
+window.startNewGame = function() {
   const diffSelect = document.getElementById('difficulty');
   const diff = diffSelect ? diffSelect.value : 'medium';
   hintsRemaining = hintRules[diff] ?? 3;
@@ -151,7 +140,7 @@ function startNewGame() {
   renderNumpad();
   startTimer();
   saveGameState();
-}
+};
 
 function generateLevel(diff) {
   if (gridDimension === 9) {
@@ -260,10 +249,12 @@ function updateNumpadState() {
 
 function renderBoard() {
   const cells = document.querySelectorAll('#board-container .cell');
+  if (!cells.length) return;
+
   cells.forEach((cell, i) => {
     const r = Math.floor(i / gridDimension);
     const c = i % gridDimension;
-    const val = currentBoard[r][c];
+    const val = currentBoard[r]?.[c] ?? 0;
 
     cell.className = 'cell';
     if (gridDimension === 9) {
@@ -274,9 +265,9 @@ function renderBoard() {
 
     if (val !== 0) {
       cell.innerText = val;
-      if (initialMask[r][c]) {
+      if (initialMask[r]?.[c]) {
         cell.classList.add('given');
-      } else if (val !== currentSolution[r][c]) {
+      } else if (val !== currentSolution[r]?.[c]) {
         cell.classList.add('invalid');
       } else {
         cell.classList.add('user-entered');
@@ -316,7 +307,7 @@ function highlightGrid() {
     cell.classList.remove('selected', 'related', 'same-val');
     const cr = Math.floor(i / gridDimension);
     const cc = i % gridDimension;
-    const cVal = currentBoard[cr][cc];
+    const cVal = currentBoard[cr]?.[cc];
 
     if (i === selectedIndex) {
       cell.classList.add('selected');
@@ -330,21 +321,22 @@ function highlightGrid() {
   });
 }
 
-function inputNumber(num) {
+window.inputNumber = function(num) {
   if (isPaused) return;
   const r = Math.floor(selectedIndex / gridDimension);
   const c = selectedIndex % gridDimension;
 
-  if (initialMask[r][c]) return;
+  if (initialMask[r]?.[c]) return;
 
   if (isNoteMode) {
     playSound('click');
     triggerVibrate(15);
+    if (!cellNotes[selectedIndex]) cellNotes[selectedIndex] = new Set();
     if (cellNotes[selectedIndex].has(num)) cellNotes[selectedIndex].delete(num);
     else cellNotes[selectedIndex].add(num);
   } else {
     currentBoard[r][c] = num;
-    cellNotes[selectedIndex].clear();
+    if (cellNotes[selectedIndex]) cellNotes[selectedIndex].clear();
 
     if (num !== currentSolution[r][c]) {
       mistakesCount++;
@@ -365,7 +357,7 @@ function inputNumber(num) {
   }
   renderBoard();
   saveGameState();
-}
+};
 
 function triggerGameOver() {
   clearInterval(timerInterval);
@@ -407,22 +399,22 @@ function checkWinCondition() {
   }
 }
 
-function eraseCell() {
+window.eraseCell = function() {
   if (isPaused) return;
   const r = Math.floor(selectedIndex / gridDimension);
   const c = selectedIndex % gridDimension;
 
-  if (initialMask[r][c]) return;
+  if (initialMask[r]?.[c]) return;
 
   playSound('click');
   triggerVibrate(15);
   currentBoard[r][c] = 0;
-  cellNotes[selectedIndex].clear();
+  if (cellNotes[selectedIndex]) cellNotes[selectedIndex].clear();
   renderBoard();
   saveGameState();
-}
+};
 
-function toggleNoteMode() {
+window.toggleNoteMode = function() {
   playSound('click');
   isNoteMode = !isNoteMode;
   const btn = document.getElementById('note-btn');
@@ -430,9 +422,9 @@ function toggleNoteMode() {
     btn.innerText = `Note ✏️ (${isNoteMode ? 'ON' : 'OFF'})`;
     btn.classList.toggle('active', isNoteMode);
   }
-}
+};
 
-function useHint() {
+window.useHint = function() {
   if (isPaused || hintsRemaining <= 0) return;
   const r = Math.floor(selectedIndex / gridDimension);
   const c = selectedIndex % gridDimension;
@@ -447,7 +439,7 @@ function useHint() {
   renderBoard();
   checkWinCondition();
   saveGameState();
-}
+};
 
 function startTimer() {
   clearInterval(timerInterval);
@@ -462,7 +454,7 @@ function startTimer() {
   }, 1000);
 }
 
-function togglePause() {
+window.togglePause = function() {
   playSound('click');
   isPaused = !isPaused;
   const overlay = document.getElementById('game-overlay');
@@ -479,7 +471,7 @@ function togglePause() {
     if (btn) btn.innerText = 'Pause ⏸️';
   }
   saveGameState();
-}
+};
 
 function setupKeyboardListeners() {
   document.addEventListener('keydown', (e) => {
@@ -501,24 +493,18 @@ function setupKeyboardListeners() {
   });
 }
 
-// Rating History Manager (Wins +100, Losses -50)
 function recordGameOutcome(difficulty, result) {
   const ratings = JSON.parse(localStorage.getItem('sudoku_ratings') || '{}');
   const key = difficulty.toLowerCase();
   
-  if (!ratings[key]) {
-    ratings[key] = [1000];
-  }
+  if (!ratings[key]) ratings[key] = [1000];
   
   const currentDiffRatings = ratings[key];
   const lastScore = currentDiffRatings[currentDiffRatings.length - 1];
 
   let newScore = lastScore;
-  if (result === 'win') {
-    newScore += 100;
-  } else if (result === 'loss') {
-    newScore = Math.max(0, lastScore - 50);
-  }
+  if (result === 'win') newScore += 100;
+  else if (result === 'loss') newScore = Math.max(0, lastScore - 50);
 
   currentDiffRatings.push(newScore);
   ratings[key] = currentDiffRatings;
@@ -543,7 +529,7 @@ function saveGameState() {
     vibeEnabled,
     difficulty: diffSelect ? diffSelect.value : 'medium',
     theme: document.body.getAttribute('data-theme') || 'light',
-    cellNotes: cellNotes.map(set => Array.from(set))
+    cellNotes: cellNotes.map(set => Array.from(set || []))
   };
   localStorage.setItem('sudoku_master_state', JSON.stringify(state));
 }
@@ -563,18 +549,12 @@ function loadGameState() {
     currentSolution = state.currentSolution;
     initialMask = state.initialMask || Array.from({ length: gridDimension }, () => Array(gridDimension).fill(false));
     cellNotes = state.cellNotes ? state.cellNotes.map(arr => new Set(arr)) : [];
-    soundEnabled = state.soundEnabled ?? true;
-    vibeEnabled = state.vibeEnabled ?? true;
 
-    const soundToggle = document.getElementById('sound-toggle');
-    const vibeToggle = document.getElementById('vibe-toggle');
     const gridSizeSelect = document.getElementById('grid-size');
     const diffSelect = document.getElementById('difficulty');
     const hintEl = document.getElementById('hint-count');
     const mistakeEl = document.getElementById('mistake-count');
 
-    if (soundToggle) soundToggle.checked = soundEnabled;
-    if (vibeToggle) vibeToggle.checked = vibeEnabled;
     if (gridSizeSelect) gridSizeSelect.value = `${gridDimension}x${gridDimension}`;
     if (diffSelect) diffSelect.value = state.difficulty || 'medium';
     if (hintEl) hintEl.innerText = hintsRemaining;
@@ -596,14 +576,6 @@ function loadGameState() {
   }
 }
 
-function clearSavedData() {
-  localStorage.removeItem('sudoku_master_state');
-  localStorage.removeItem('sudoku_ratings');
-  alert('Game ratings and history reset!');
-  startNewGame();
-}
-
-// Fixed Chart Initialization & Dynamic Updating Logic
 function renderOrUpdateChart() {
   const canvas = document.getElementById('performanceChart') || document.getElementById('analyticsChart');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -613,14 +585,14 @@ function renderOrUpdateChart() {
   const difficulty = diffSelect ? diffSelect.value.toLowerCase() : 'medium';
 
   const ratings = JSON.parse(localStorage.getItem('sudoku_ratings') || '{}');
-  const diffData = ratings[difficulty] || [1000, 1000]; // Guarantees baseline rendering even if 0 games played
+  const diffData = ratings[difficulty] || [1000, 1000];
   const labels = diffData.map((_, i) => i === 0 ? 'Start' : `Game #${i}`);
 
   if (performanceChart) {
     performanceChart.data.labels = labels;
     performanceChart.data.datasets[0].data = diffData;
     performanceChart.update();
-    performanceChart.resize(); // Fixes hidden tab 0px height issue
+    performanceChart.resize();
   } else {
     performanceChart = new Chart(ctx, {
       type: 'line',
@@ -639,16 +611,21 @@ function renderOrUpdateChart() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: false
-          }
-        }
+        scales: { y: { beginAtZero: false } }
       }
     });
   }
 }
 
-// Event listener for Status view difficulty selector change
+document.addEventListener('DOMContentLoaded', () => {
+  setupKeyboardListeners();
+  if (!loadGameState()) {
+    startNewGame();
+  }
+});
+
 document.addEventListener('change', (e) => {
- 
+  if (e.target && (e.target.id === 'chart-difficulty' || e.target.id === 'difficulty-select')) {
+    renderOrUpdateChart();
+  }
+});
