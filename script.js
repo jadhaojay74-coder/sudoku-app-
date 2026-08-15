@@ -1,4 +1,3 @@
-// Global State Variables
 let timerInterval = null;
 let secondsElapsed = 0;
 let isPaused = false;
@@ -32,7 +31,6 @@ let currentBoard = [];
 let initialMask = [];
 let cellNotes = [];
 
-// Web Audio Synthesizer
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 function playSound(type) {
@@ -50,41 +48,34 @@ function playSound(type) {
     osc.frequency.setValueAtTime(600, now);
     gain.gain.setValueAtTime(0.1, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    osc.start(now);
-    osc.stop(now + 0.05);
+    osc.start(now); osc.stop(now + 0.05);
   } else if (type === 'error') {
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(150, now);
     gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    osc.start(now);
-    osc.stop(now + 0.25);
+    osc.start(now); osc.stop(now + 0.25);
   } else if (type === 'gameover') {
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(200, now);
     osc.frequency.exponentialRampToValueAtTime(80, now + 0.5);
     gain.gain.setValueAtTime(0.3, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-    osc.start(now);
-    osc.stop(now + 0.5);
+    osc.start(now); osc.stop(now + 0.5);
   } else if (type === 'win') {
     osc.frequency.setValueAtTime(440, now);
     osc.frequency.setValueAtTime(554.37, now + 0.1);
     osc.frequency.setValueAtTime(659.25, now + 0.2);
     gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-    osc.start(now);
-    osc.stop(now + 0.4);
+    osc.start(now); osc.stop(now + 0.4);
   }
 }
 
 function triggerVibrate(ms = 30) {
-  if (vibeEnabled && navigator.vibrate) {
-    navigator.vibrate(ms);
-  }
+  if (vibeEnabled && navigator.vibrate) navigator.vibrate(ms);
 }
 
-// Global Tab Switcher
 window.switchTab = function(tabId, btn) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -93,10 +84,8 @@ window.switchTab = function(tabId, btn) {
   if (targetView) targetView.classList.add('active');
   if (btn) btn.classList.add('active');
 
-  if (tabId === 'status-view' || tabId === 'status-tab') {
-    setTimeout(() => {
-      renderOrUpdateChart();
-    }, 100);
+  if (tabId === 'status-view') {
+    setTimeout(() => renderOrUpdateChart(), 100);
   }
 };
 
@@ -192,7 +181,6 @@ function initBoardUI() {
   for (let i = 0; i < totalCells; i++) {
     const row = Math.floor(i / gridDimension);
     const col = i % gridDimension;
-    
     const cell = document.createElement('div');
     cell.className = 'cell';
 
@@ -229,7 +217,7 @@ function updateNumpadState() {
     let count = 0;
     for (let r = 0; r < gridDimension; r++) {
       for (let c = 0; c < gridDimension; c++) {
-        if (currentBoard[r][c] === num && currentSolution[r][c] === num) {
+        if (currentBoard[r]?.[c] === num && currentSolution[r]?.[c] === num) {
           count++;
         }
       }
@@ -373,9 +361,7 @@ function triggerGameOver() {
     overlay.classList.add('active');
   }
 
-  setTimeout(() => {
-    startNewGame();
-  }, 2200);
+  setTimeout(() => startNewGame(), 2200);
 }
 
 function checkWinCondition() {
@@ -576,12 +562,19 @@ function loadGameState() {
   }
 }
 
+window.clearSavedData = function() {
+  localStorage.removeItem('sudoku_master_state');
+  localStorage.removeItem('sudoku_ratings');
+  alert('All saved states and ratings reset!');
+  startNewGame();
+};
+
 function renderOrUpdateChart() {
-  const canvas = document.getElementById('performanceChart') || document.getElementById('analyticsChart');
+  const canvas = document.getElementById('analyticsChart');
   if (!canvas || typeof Chart === 'undefined') return;
 
   const ctx = canvas.getContext('2d');
-  const diffSelect = document.getElementById('chart-difficulty') || document.getElementById('difficulty-select');
+  const diffSelect = document.getElementById('difficulty-select');
   const difficulty = diffSelect ? diffSelect.value.toLowerCase() : 'medium';
 
   const ratings = JSON.parse(localStorage.getItem('sudoku_ratings') || '{}');
@@ -625,7 +618,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('change', (e) => {
-  if (e.target && (e.target.id === 'chart-difficulty' || e.target.id === 'difficulty-select')) {
+  if (e.target && e.target.id === 'difficulty-select') {
     renderOrUpdateChart();
   }
 });
+        
