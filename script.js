@@ -1,625 +1,426 @@
+// State Management
+let gridDim = 9;
+let solutionGrid = [];
+let initialGrid = [];
+let userGrid = [];
+let notesGrid = [];
+
+let selectedCell = null;
+let noteMode = false;
+let isPaused = false;
 let timerInterval = null;
 let secondsElapsed = 0;
-let isPaused = false;
-let isNoteMode = false;
-let selectedIndex = 0;
-let hintsRemaining = 3;
-let mistakesCount = 0;
+let mistakes = 0;
 let maxMistakes = 3;
-let gridDimension = 9;
-let performanceChart = null;
+let hintsRemaining = 3;
+let analyticsChart = null;
 
-let soundEnabled = true;
-let vibeEnabled = true;
-
-const hintRules = { simple: 3, medium: 2, hard: 1, expert: 0 };
-
-const base9x9 = [
-  [5,3,4,6,7,8,9,1,2],[6,7,2,1,9,5,3,4,8],[1,9,8,3,4,2,5,6,7],
-  [8,5,9,7,6,1,4,2,3],[4,2,6,8,5,3,7,9,1],[7,1,3,9,2,4,8,5,6],
-  [9,6,1,5,3,7,2,8,4],[2,8,7,4,1,9,6,3,5],[3,4,5,2,8,6,1,7,9]
-];
-
-const base3x3 = [
-  [1,2,3],
-  [2,3,1],
-  [3,1,2]
-];
-
-let currentSolution = [];
-let currentBoard = [];
-let initialMask = [];
-let cellNotes = [];
-
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-function playSound(type) {
-  if (!soundEnabled) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  const now = audioCtx.currentTime;
-
-  if (type === 'click') {
-    osc.frequency.setValueAtTime(600, now);
-    gain.gain.setValueAtTime(0.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    osc.start(now); osc.stop(now + 0.05);
-  } else if (type === 'error') {
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, now);
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-    osc.start(now); osc.stop(now + 0.25);
-  } else if (type === 'gameover') {
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.exponentialRampToValueAtTime(80, now + 0.5);
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-    osc.start(now); osc.stop(now + 0.5);
-  } else if (type === 'win') {
-    osc.frequency.setValueAtTime(440, now);
-    osc.frequency.setValueAtTime(554.37, now + 0.1);
-    osc.frequency.setValueAtTime(659.25, now + 0.2);
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-    osc.start(now); osc.stop(now + 0.4);
-  }
-}
-
-function triggerVibrate(ms = 30) {
-  if (vibeEnabled && navigator.vibrate) navigator.vibrate(ms);
-}
-
-window.switchTab = function(tabId, btn) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  
-  const targetView = document.getElementById(tabId);
-  if (targetView) targetView.classList.add('active');
-  if (btn) btn.classList.add('active');
-
-  if (tabId === 'status-view') {
-    setTimeout(() => renderOrUpdateChart(), 100);
-  }
-};
-
-window.toggleTheme = function() {
-  const current = document.body.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.body.setAttribute('data-theme', next);
-  const themeBtn = document.getElementById('theme-btn');
-  if (themeBtn) themeBtn.innerText = next === 'dark' ? '☀️ Light' : '🌙 Dark';
-  saveGameState();
-};
-
-window.changeGridMode = function() {
-  const modeSelect = document.getElementById('grid-size');
-  const mode = modeSelect ? modeSelect.value : '9x9';
-  gridDimension = mode === '3x3' ? 3 : 9;
+// Initialization
+document.addEventListener("DOMContentLoaded", () => {
+  loadSettings();
+  initNumpad();
   startNewGame();
-};
+  setupAnalyticsChart();
+  setupDifficultyListener();
+});
 
-window.startNewGame = function() {
-  const diffSelect = document.getElementById('difficulty');
-  const diff = diffSelect ? diffSelect.value : 'medium';
-  hintsRemaining = hintRules[diff] ?? 3;
-  maxMistakes = diff === 'expert' ? 2 : 3;
-  mistakesCount = 0;
+// Tab Switching (Works with both status-view and status-tab)
+function switchTab(tabId, btnElement) {
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+  if (btnElement) btnElement.classList.add('active');
 
-  const hintEl = document.getElementById('hint-count');
-  const mistakeEl = document.getElementById('mistake-count');
-  if (hintEl) hintEl.innerText = hintsRemaining;
-  if (mistakeEl) mistakeEl.innerText = `0/${maxMistakes}`;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
 
+  if (tabId === 'game-view') {
+    document.getElementById('game-view').classList.add('active');
+  } else if (tabId === 'status-view' || tabId === 'status-tab') {
+    const statusTab = document.getElementById('status-tab');
+    if (statusTab) statusTab.style.display = 'block';
+    renderAnalytics();
+  } else if (tabId === 'settings-view') {
+    document.getElementById('settings-view').classList.add('active');
+  }
+}
+
+// Mode & Difficulty Handlers
+function changeGridMode() {
+  const mode = document.getElementById("grid-size").value;
+  gridDim = mode === "3x3" ? 3 : 9;
+  initNumpad();
+  startNewGame();
+}
+
+function startNewGame() {
+  const diff = document.getElementById("difficulty").value;
+  maxMistakes = diff === "expert" ? 2 : 3;
+  mistakes = 0;
+  hintsRemaining = 3;
   secondsElapsed = 0;
   isPaused = false;
-  
-  const overlay = document.getElementById('game-overlay');
-  if (overlay) overlay.classList.remove('active');
+  selectedCell = null;
 
-  generateLevel(diff);
-  initBoardUI();
+  document.getElementById("mistake-count").innerText = `${mistakes}/${maxMistakes}`;
+  document.getElementById("hint-count").innerText = hintsRemaining;
+  document.getElementById("game-overlay").classList.remove("active");
+
+  generatePuzzle(diff);
   renderBoard();
-  renderNumpad();
-  startTimer();
-  saveGameState();
-};
-
-function generateLevel(diff) {
-  if (gridDimension === 9) {
-    currentSolution = JSON.parse(JSON.stringify(base9x9));
-    const map = [1,2,3,4,5,6,7,8,9].sort(() => Math.random() - 0.5);
-    for(let r=0; r<9; r++) {
-      for(let c=0; c<9; c++) {
-        currentSolution[r][c] = map[currentSolution[r][c] - 1];
-      }
-    }
-    const hiddenCounts = { simple: 25, medium: 40, hard: 50, expert: 58 };
-    hideCells(hiddenCounts[diff] || 40);
-  } else {
-    currentSolution = JSON.parse(JSON.stringify(base3x3));
-    const map = [1,2,3].sort(() => Math.random() - 0.5);
-    for(let r=0; r<3; r++) {
-      for(let c=0; c<3; c++) {
-        currentSolution[r][c] = map[currentSolution[r][c] - 1];
-      }
-    }
-    const hiddenCounts = { simple: 3, medium: 4, hard: 5, expert: 6 };
-    hideCells(hiddenCounts[diff] || 4);
-  }
-  cellNotes = Array.from({ length: gridDimension * gridDimension }, () => new Set());
+  resetTimer();
 }
 
-function hideCells(count) {
-  currentBoard = JSON.parse(JSON.stringify(currentSolution));
-  initialMask = Array.from({ length: gridDimension }, () => Array(gridDimension).fill(true));
-  let hidden = 0;
-  while (hidden < count) {
-    let r = Math.floor(Math.random() * gridDimension);
-    let c = Math.floor(Math.random() * gridDimension);
-    if (currentBoard[r][c] !== 0) {
-      currentBoard[r][c] = 0;
-      initialMask[r][c] = false;
-      hidden++;
+// Sudoku Board Generation & Solvers
+function generatePuzzle(diff) {
+  solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
+  fillGrid(solutionGrid);
+
+  initialGrid = solutionGrid.map(row => [...row]);
+  userGrid = solutionGrid.map(row => [...row]);
+  notesGrid = Array.from({ length: gridDim }, () => Array.from({ length: gridDim }, () => []));
+
+  let holes = gridDim === 3 ? 3 : diff === "simple" ? 30 : diff === "medium" ? 42 : diff === "hard" ? 50 : 56;
+  while (holes > 0) {
+    let r = Math.floor(Math.random() * gridDim);
+    let c = Math.floor(Math.random() * gridDim);
+    if (initialGrid[r][c] !== 0) {
+      initialGrid[r][c] = 0;
+      userGrid[r][c] = 0;
+      holes--;
     }
   }
 }
 
-function initBoardUI() {
-  const container = document.getElementById('board-container');
-  if (!container) return;
-  container.className = `board-container grid-${gridDimension}x${gridDimension}`;
-  container.innerHTML = '<div class="overlay-screen" id="game-overlay"></div>';
-
-  const totalCells = gridDimension * gridDimension;
-  for (let i = 0; i < totalCells; i++) {
-    const row = Math.floor(i / gridDimension);
-    const col = i % gridDimension;
-    const cell = document.createElement('div');
-    cell.className = 'cell';
-
-    if (gridDimension === 9) {
-      if ((col + 1) % 3 === 0 && col !== 8) cell.classList.add('box-right');
-      if ((row + 1) % 3 === 0 && row !== 8) cell.classList.add('box-bottom');
-    }
-
-    cell.dataset.index = i;
-    cell.onclick = () => selectCell(i);
-    container.appendChild(cell);
-  }
-  selectedIndex = 0;
-}
-
-function renderNumpad() {
-  const container = document.getElementById('numpad');
-  if (!container) return;
-  container.innerHTML = '';
-
-  for (let num = 1; num <= gridDimension; num++) {
-    const btn = document.createElement('button');
-    btn.className = 'btn';
-    btn.id = `numpad-${num}`;
-    btn.innerText = num;
-    btn.onclick = () => inputNumber(num);
-    container.appendChild(btn);
-  }
-  updateNumpadState();
-}
-
-function updateNumpadState() {
-  for (let num = 1; num <= gridDimension; num++) {
-    let count = 0;
-    for (let r = 0; r < gridDimension; r++) {
-      for (let c = 0; c < gridDimension; c++) {
-        if (currentBoard[r]?.[c] === num && currentSolution[r]?.[c] === num) {
-          count++;
+function fillGrid(grid) {
+  for (let r = 0; r < gridDim; r++) {
+    for (let c = 0; c < gridDim; c++) {
+      if (grid[r][c] === 0) {
+        let nums = shuffle(Array.from({ length: gridDim }, (_, i) => i + 1));
+        for (let num of nums) {
+          if (isValidPlacement(grid, r, c, num)) {
+            grid[r][c] = num;
+            if (fillGrid(grid)) return true;
+            grid[r][c] = 0;
+          }
         }
+        return false;
       }
     }
-    const btn = document.getElementById(`numpad-${num}`);
-    if (btn) {
-      if (count === gridDimension) {
-        btn.innerHTML = `${num} ✓`;
-        btn.classList.add('completed');
-      } else {
-        btn.innerText = num;
-        btn.classList.remove('completed');
+  }
+  return true;
+}
+
+function isValidPlacement(grid, row, col, num) {
+  for (let i = 0; i < gridDim; i++) {
+    if (grid[row][i] === num || grid[i][col] === num) return false;
+  }
+  if (gridDim === 9) {
+    let startR = Math.floor(row / 3) * 3;
+    let startC = Math.floor(col / 3) * 3;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (grid[startR + r][startC + c] === num) return false;
       }
+    }
+  }
+  return true;
+}
+
+function shuffle(arr) {
+  return arr.sort(() => Math.random() - 0.5);
+}
+
+// Rendering Logic
+function renderBoard() {
+  const container = document.getElementById("board-container");
+  container.className = `board-container grid-${gridDim}x${gridDim}`;
+  container.innerHTML = `<div class="overlay-screen" id="game-overlay"></div>`;
+
+  for (let r = 0; r < gridDim; r++) {
+    for (let c = 0; c < gridDim; c++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+
+      if (initialGrid[r][c] !== 0) {
+        cell.classList.add("given");
+        cell.innerText = initialGrid[r][c];
+      } else if (userGrid[r][c] !== 0) {
+        cell.innerText = userGrid[r][c];
+        if (userGrid[r][c] !== solutionGrid[r][c]) cell.classList.add("invalid");
+      } else if (notesGrid[r][c].length > 0) {
+        const notesContainer = document.createElement("div");
+        notesContainer.className = "cell-notes";
+        for (let i = 1; i <= gridDim; i++) {
+          const noteItem = document.createElement("span");
+          noteItem.innerText = notesGrid[r][c].includes(i) ? i : "";
+          notesContainer.appendChild(noteItem);
+        }
+        cell.appendChild(notesContainer);
+      }
+
+      cell.addEventListener("click", () => selectCell(r, c));
+      container.appendChild(cell);
     }
   }
 }
 
-function renderBoard() {
-  const cells = document.querySelectorAll('#board-container .cell');
-  if (!cells.length) return;
-
-  cells.forEach((cell, i) => {
-    const r = Math.floor(i / gridDimension);
-    const c = i % gridDimension;
-    const val = currentBoard[r]?.[c] ?? 0;
-
-    cell.className = 'cell';
-    if (gridDimension === 9) {
-      if ((c + 1) % 3 === 0 && c !== 8) cell.classList.add('box-right');
-      if ((r + 1) % 3 === 0 && r !== 8) cell.classList.add('box-bottom');
-    }
-    cell.innerHTML = '';
-
-    if (val !== 0) {
-      cell.innerText = val;
-      if (initialMask[r]?.[c]) {
-        cell.classList.add('given');
-      } else if (val !== currentSolution[r]?.[c]) {
-        cell.classList.add('invalid');
-      } else {
-        cell.classList.add('user-entered');
-      }
-    } else if (cellNotes[i] && cellNotes[i].size > 0) {
-      const noteGrid = document.createElement('div');
-      noteGrid.className = 'notes-grid';
-      for (let n = 1; n <= gridDimension; n++) {
-        const sub = document.createElement('div');
-        sub.innerText = cellNotes[i].has(n) ? n : '';
-        noteGrid.appendChild(sub);
-      }
-      cell.appendChild(noteGrid);
-    }
-  });
-  highlightGrid();
-  updateNumpadState();
+function initNumpad() {
+  const numpad = document.getElementById("numpad");
+  numpad.innerHTML = "";
+  for (let i = 1; i <= gridDim; i++) {
+    const btn = document.createElement("button");
+    btn.className = "num-btn";
+    btn.innerText = i;
+    btn.onclick = () => handleInput(i);
+    numpad.appendChild(btn);
+  }
 }
 
-function selectCell(index) {
-  if (isPaused) return;
-  playSound('click');
-  triggerVibrate(15);
-  selectedIndex = index;
-  highlightGrid();
-}
+function selectCell(r, c) {
+  selectedCell = { r, c };
+  const val = userGrid[r][c];
 
-function highlightGrid() {
-  const cells = document.querySelectorAll('#board-container .cell');
-  if (!cells.length) return;
+  document.querySelectorAll(".cell").forEach(cell => {
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    cell.classList.remove("selected", "related", "same-val");
 
-  const r = Math.floor(selectedIndex / gridDimension);
-  const c = selectedIndex % gridDimension;
-  const val = currentBoard[r]?.[c];
-
-  cells.forEach((cell, i) => {
-    cell.classList.remove('selected', 'related', 'same-val');
-    const cr = Math.floor(i / gridDimension);
-    const cc = i % gridDimension;
-    const cVal = currentBoard[cr]?.[cc];
-
-    if (i === selectedIndex) {
-      cell.classList.add('selected');
-    } else if (cr === r || cc === c || (gridDimension === 9 && Math.floor(cr/3) === Math.floor(r/3) && Math.floor(cc/3) === Math.floor(c/3))) {
-      cell.classList.add('related');
+    if (row === r && col === c) {
+      cell.classList.add("selected");
+    } else if (row === r || col === c || (gridDim === 9 && Math.floor(row/3) === Math.floor(r/3) && Math.floor(col/3) === Math.floor(c/3))) {
+      cell.classList.add("related");
     }
-
-    if (val !== 0 && cVal === val) {
-      cell.classList.add('same-val');
+    if (val !== 0 && userGrid[row][col] === val) {
+      cell.classList.add("same-val");
     }
   });
 }
 
-window.inputNumber = function(num) {
-  if (isPaused) return;
-  const r = Math.floor(selectedIndex / gridDimension);
-  const c = selectedIndex % gridDimension;
+// User Actions
+function handleInput(num) {
+  if (!selectedCell || isPaused) return;
+  const { r, c } = selectedCell;
+  if (initialGrid[r][c] !== 0) return;
 
-  if (initialMask[r]?.[c]) return;
-
-  if (isNoteMode) {
-    playSound('click');
-    triggerVibrate(15);
-    if (!cellNotes[selectedIndex]) cellNotes[selectedIndex] = new Set();
-    if (cellNotes[selectedIndex].has(num)) cellNotes[selectedIndex].delete(num);
-    else cellNotes[selectedIndex].add(num);
+  if (noteMode) {
+    userGrid[r][c] = 0;
+    const idx = notesGrid[r][c].indexOf(num);
+    if (idx > -1) notesGrid[r][c].splice(idx, 1);
+    else notesGrid[r][c].push(num);
   } else {
-    currentBoard[r][c] = num;
-    if (cellNotes[selectedIndex]) cellNotes[selectedIndex].clear();
+    notesGrid[r][c] = [];
+    userGrid[r][c] = num;
 
-    if (num !== currentSolution[r][c]) {
-      mistakesCount++;
-      playSound('error');
-      triggerVibrate([50, 50, 100]);
-      const mistakeEl = document.getElementById('mistake-count');
-      if (mistakeEl) mistakeEl.innerText = `${mistakesCount}/${maxMistakes}`;
-
-      if (mistakesCount >= maxMistakes) {
-        triggerGameOver();
+    if (num !== solutionGrid[r][c]) {
+      mistakes++;
+      document.getElementById("mistake-count").innerText = `${mistakes}/${maxMistakes}`;
+      triggerVibration();
+      if (mistakes >= maxMistakes) {
+        endGame(false);
         return;
       }
-    } else {
-      playSound('click');
-      triggerVibrate(20);
-      checkWinCondition();
     }
   }
   renderBoard();
-  saveGameState();
-};
-
-function triggerGameOver() {
-  clearInterval(timerInterval);
-  playSound('gameover');
-  
-  const diffSelect = document.getElementById('difficulty');
-  const diff = diffSelect ? diffSelect.value : 'medium';
-  recordGameOutcome(diff, 'loss');
-
-  const overlay = document.getElementById('game-overlay');
-  if (overlay) {
-    overlay.innerHTML = `<div>Game Over ❌</div><div style="font-size: 0.9rem; margin-top: 10px;">Too many mistakes made!</div>`;
-    overlay.classList.add('active');
-  }
-
-  setTimeout(() => startNewGame(), 2200);
+  selectCell(r, c);
+  checkWin();
 }
 
-function checkWinCondition() {
-  for (let r = 0; r < gridDimension; r++) {
-    for (let c = 0; c < gridDimension; c++) {
-      if (currentBoard[r][c] !== currentSolution[r][c]) return;
-    }
-  }
-  
-  clearInterval(timerInterval);
-  playSound('win');
-  
-  const diffSelect = document.getElementById('difficulty');
-  const diff = diffSelect ? diffSelect.value : 'medium';
-  recordGameOutcome(diff, 'win');
-
-  const overlay = document.getElementById('game-overlay');
-  if (overlay) {
-    overlay.innerHTML = `<div>Victory! 🎉</div><div style="font-size: 0.9rem; margin-top: 10px;">Solved in ${secondsElapsed} seconds!</div>`;
-    overlay.classList.add('active');
-  }
+function toggleNoteMode() {
+  noteMode = !noteMode;
+  const noteBtn = document.getElementById("note-btn");
+  noteBtn.innerText = `Note ✏️ (${noteMode ? "ON" : "OFF"})`;
 }
 
-window.eraseCell = function() {
-  if (isPaused) return;
-  const r = Math.floor(selectedIndex / gridDimension);
-  const c = selectedIndex % gridDimension;
+function eraseCell() {
+  if (!selectedCell || isPaused) return;
+  const { r, c } = selectedCell;
+  if (initialGrid[r][c] !== 0) return;
 
-  if (initialMask[r]?.[c]) return;
-
-  playSound('click');
-  triggerVibrate(15);
-  currentBoard[r][c] = 0;
-  if (cellNotes[selectedIndex]) cellNotes[selectedIndex].clear();
+  userGrid[r][c] = 0;
+  notesGrid[r][c] = [];
   renderBoard();
-  saveGameState();
-};
+  selectCell(r, c);
+}
 
-window.toggleNoteMode = function() {
-  playSound('click');
-  isNoteMode = !isNoteMode;
-  const btn = document.getElementById('note-btn');
-  if (btn) {
-    btn.innerText = `Note ✏️ (${isNoteMode ? 'ON' : 'OFF'})`;
-    btn.classList.toggle('active', isNoteMode);
-  }
-};
+function useHint() {
+  if (!selectedCell || hintsRemaining <= 0 || isPaused) return;
+  const { r, c } = selectedCell;
+  if (initialGrid[r][c] !== 0 || userGrid[r][c] === solutionGrid[r][c]) return;
 
-window.useHint = function() {
-  if (isPaused || hintsRemaining <= 0) return;
-  const r = Math.floor(selectedIndex / gridDimension);
-  const c = selectedIndex % gridDimension;
-
-  if (currentBoard[r][c] !== 0 && currentBoard[r][c] === currentSolution[r][c]) return;
-
-  playSound('click');
-  currentBoard[r][c] = currentSolution[r][c];
+  userGrid[r][c] = solutionGrid[r][c];
+  notesGrid[r][c] = [];
   hintsRemaining--;
-  const hintEl = document.getElementById('hint-count');
-  if (hintEl) hintEl.innerText = hintsRemaining;
+  document.getElementById("hint-count").innerText = hintsRemaining;
   renderBoard();
-  checkWinCondition();
-  saveGameState();
-};
+  selectCell(r, c);
+  checkWin();
+}
 
-function startTimer() {
+// Timer & Game Flow Controls
+function resetTimer() {
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     if (!isPaused) {
       secondsElapsed++;
-      const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-      const secs = String(secondsElapsed % 60).padStart(2, '0');
-      const timerEl = document.getElementById('timer');
-      if (timerEl) timerEl.innerText = `${mins}:${secs}`;
+      const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+      const secs = String(secondsElapsed % 60).padStart(2, "0");
+      document.getElementById("timer").innerText = `${mins}:${secs}`;
     }
   }, 1000);
 }
 
-window.togglePause = function() {
-  playSound('click');
+function togglePause() {
   isPaused = !isPaused;
-  const overlay = document.getElementById('game-overlay');
-  const btn = document.getElementById('pause-btn');
+  const overlay = document.getElementById("game-overlay");
+  const pauseBtn = document.getElementById("pause-btn");
 
   if (isPaused) {
-    if (overlay) {
-      overlay.innerText = 'Game Paused ⏸️';
-      overlay.classList.add('active');
-    }
-    if (btn) btn.innerText = 'Resume ▶️';
+    overlay.innerText = "Game Paused ⏸️";
+    overlay.classList.add("active");
+    pauseBtn.innerText = "Resume ▶️";
   } else {
-    if (overlay) overlay.classList.remove('active');
-    if (btn) btn.innerText = 'Pause ⏸️';
+    overlay.classList.remove("active");
+    pauseBtn.innerText = "Pause ⏸️";
   }
-  saveGameState();
-};
+}
 
-function setupKeyboardListeners() {
-  document.addEventListener('keydown', (e) => {
-    if (isPaused) return;
+function checkWin() {
+  for (let r = 0; r < gridDim; r++) {
+    for (let c = 0; c < gridDim; c++) {
+      if (userGrid[r][c] !== solutionGrid[r][c]) return;
+    }
+  }
+  endGame(true);
+}
 
-    const row = Math.floor(selectedIndex / gridDimension);
-    const col = selectedIndex % gridDimension;
+function endGame(isWin) {
+  clearInterval(timerInterval);
+  const overlay = document.getElementById("game-overlay");
+  overlay.innerText = isWin ? "You Won! 🎉" : "Game Over ❌";
+  overlay.classList.add("active");
 
-    if (e.key === 'ArrowUp' && row > 0) selectedIndex -= gridDimension;
-    else if (e.key === 'ArrowDown' && row < gridDimension - 1) selectedIndex += gridDimension;
-    else if (e.key === 'ArrowLeft' && col > 0) selectedIndex -= 1;
-    else if (e.key === 'ArrowRight' && col < gridDimension - 1) selectedIndex += 1;
-    else if (e.key >= '1' && e.key <= String(gridDimension)) inputNumber(parseInt(e.key));
-    else if (e.key === 'Backspace' || e.key === 'Delete') eraseCell();
-    else if (e.key.toLowerCase() === 'n') toggleNoteMode();
-    else if (e.key.toLowerCase() === 'p') togglePause();
+  saveGameScore(isWin);
+}
 
-    highlightGrid();
+// Analytics, Memory & Graph Logic (Starts from 0, Tracks Actual Games Played)
+function saveGameScore(isWin) {
+  const diffSelect = document.getElementById("difficulty").value;
+  const diffKey = diffSelect.charAt(0).toUpperCase() + diffSelect.slice(1);
+  const today = new Date().toISOString().split('T')[0];
+
+  let history = JSON.parse(localStorage.getItem("sudoku_analytics_data")) || [];
+  
+  // Calculate score: Score starts from 0 based on wins (+100) and losses (-50)
+  const prevScore = history.length > 0 ? history[history.length - 1].score : 0;
+  const newScore = Math.max(0, prevScore + (isWin ? 100 : -50));
+
+  history.push({
+    gameNum: history.length + 1,
+    date: today,
+    difficulty: diffKey,
+    score: newScore
+  });
+
+  localStorage.setItem("sudoku_analytics_data", JSON.stringify(history));
+}
+
+function setupAnalyticsChart() {
+  const ctx = document.getElementById("analyticsChart");
+  if (!ctx) return;
+
+  analyticsChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [{
+        label: "Rating",
+        data: [],
+        borderColor: "#3b82f6",
+        backgroundColor: "rgba(59, 130, 246, 0.1)",
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true },
+        x: { title: { display: true, text: 'Games Played' } }
+      }
+    }
   });
 }
 
-function recordGameOutcome(difficulty, result) {
-  const ratings = JSON.parse(localStorage.getItem('sudoku_ratings') || '{}');
-  const key = difficulty.toLowerCase();
-  
-  if (!ratings[key]) ratings[key] = [1000];
-  
-  const currentDiffRatings = ratings[key];
-  const lastScore = currentDiffRatings[currentDiffRatings.length - 1];
-
-  let newScore = lastScore;
-  if (result === 'win') newScore += 100;
-  else if (result === 'loss') newScore = Math.max(0, lastScore - 50);
-
-  currentDiffRatings.push(newScore);
-  ratings[key] = currentDiffRatings;
-  localStorage.setItem('sudoku_ratings', JSON.stringify(ratings));
-
-  renderOrUpdateChart();
-}
-
-function saveGameState() {
-  const diffSelect = document.getElementById('difficulty');
-  const state = {
-    gridDimension,
-    secondsElapsed,
-    isPaused,
-    hintsRemaining,
-    mistakesCount,
-    maxMistakes,
-    currentBoard,
-    currentSolution,
-    initialMask,
-    soundEnabled,
-    vibeEnabled,
-    difficulty: diffSelect ? diffSelect.value : 'medium',
-    theme: document.body.getAttribute('data-theme') || 'light',
-    cellNotes: cellNotes.map(set => Array.from(set || []))
-  };
-  localStorage.setItem('sudoku_master_state', JSON.stringify(state));
-}
-
-function loadGameState() {
-  const saved = localStorage.getItem('sudoku_master_state');
-  if (!saved) return false;
-
-  try {
-    const state = JSON.parse(saved);
-    gridDimension = state.gridDimension || 9;
-    secondsElapsed = state.secondsElapsed || 0;
-    hintsRemaining = state.hintsRemaining ?? 3;
-    mistakesCount = state.mistakesCount || 0;
-    maxMistakes = state.maxMistakes || (state.difficulty === 'expert' ? 2 : 3);
-    currentBoard = state.currentBoard;
-    currentSolution = state.currentSolution;
-    initialMask = state.initialMask || Array.from({ length: gridDimension }, () => Array(gridDimension).fill(false));
-    cellNotes = state.cellNotes ? state.cellNotes.map(arr => new Set(arr)) : [];
-
-    const gridSizeSelect = document.getElementById('grid-size');
-    const diffSelect = document.getElementById('difficulty');
-    const hintEl = document.getElementById('hint-count');
-    const mistakeEl = document.getElementById('mistake-count');
-
-    if (gridSizeSelect) gridSizeSelect.value = `${gridDimension}x${gridDimension}`;
-    if (diffSelect) diffSelect.value = state.difficulty || 'medium';
-    if (hintEl) hintEl.innerText = hintsRemaining;
-    if (mistakeEl) mistakeEl.innerText = `${mistakesCount}/${maxMistakes}`;
-
-    if (state.theme === 'dark') {
-      document.body.setAttribute('data-theme', 'dark');
-      const themeBtn = document.getElementById('theme-btn');
-      if (themeBtn) themeBtn.innerText = '☀️ Light';
-    }
-
-    initBoardUI();
-    renderBoard();
-    renderNumpad();
-    startTimer();
-    return true;
-  } catch (e) {
-    return false;
+function setupDifficultyListener() {
+  const diffSelect = document.getElementById("difficulty-select");
+  if (diffSelect) {
+    diffSelect.addEventListener("change", renderAnalytics);
   }
 }
 
-window.clearSavedData = function() {
-  localStorage.removeItem('sudoku_master_state');
-  localStorage.removeItem('sudoku_ratings');
-  alert('All saved states and ratings reset!');
-  startNewGame();
-};
+function renderAnalytics() {
+  if (!analyticsChart) return;
 
-function renderOrUpdateChart() {
-  const canvas = document.getElementById('analyticsChart');
-  if (!canvas || typeof Chart === 'undefined') return;
+  const selectedDiff = document.getElementById("difficulty-select").value;
+  const history = JSON.parse(localStorage.getItem("sudoku_analytics_data")) || [];
+  
+  const filtered = history.filter(item => item.difficulty.toLowerCase() === selectedDiff.toLowerCase());
 
-  const ctx = canvas.getContext('2d');
-  const diffSelect = document.getElementById('difficulty-select');
-  const difficulty = diffSelect ? diffSelect.value.toLowerCase() : 'medium';
+  // Chart starts accurately with played games (1, 2, 3...) starting from baseline 0
+  const labels = filtered.map((item, idx) => `Game ${idx + 1} (${item.date})`);
+  const dataPoints = filtered.map(item => item.score);
 
-  const ratings = JSON.parse(localStorage.getItem('sudoku_ratings') || '{}');
-  const diffData = ratings[difficulty] || [1000, 1000];
-  const labels = diffData.map((_, i) => i === 0 ? 'Start' : `Game #${i}`);
+  analyticsChart.data.labels = labels.length > 0 ? labels : ["No Games Played"];
+  analyticsChart.data.datasets[0].data = dataPoints.length > 0 ? dataPoints : [0];
+  analyticsChart.update();
+}
 
-  if (performanceChart) {
-    performanceChart.data.labels = labels;
-    performanceChart.data.datasets[0].data = diffData;
-    performanceChart.update();
-    performanceChart.resize();
-  } else {
-    performanceChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Skill Score Rating',
-          data: diffData,
-          borderColor: '#3498db',
-          borderWidth: 3,
-          tension: 0.3,
-          fill: true,
-          backgroundColor: 'rgba(52, 152, 219, 0.15)'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { beginAtZero: false } }
-      }
-    });
+function clearSavedData() {
+  if (confirm("Reset all statistics and saved memory?")) {
+    localStorage.removeItem("sudoku_analytics_data");
+    renderAnalytics();
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  setupKeyboardListeners();
-  if (!loadGameState()) {
-    startNewGame();
+// Utility Features (Keyboard, Theme, Vibrations)
+document.addEventListener("keydown", (e) => {
+  if (!selectedCell || isPaused) return;
+  if (e.key >= "1" && e.key <= String(gridDim)) handleInput(parseInt(e.key));
+  else if (e.key === "Backspace" || e.key === "Delete") eraseCell();
+  else if (e.key.toLowerCase() === "n") toggleNoteMode();
+  else if (e.key.toLowerCase() === "p") togglePause();
+  else if (e.key.startsWith("Arrow")) {
+    let { r, c } = selectedCell;
+    if (e.key === "ArrowUp") r = Math.max(0, r - 1);
+    if (e.key === "ArrowDown") r = Math.min(gridDim - 1, r + 1);
+    if (e.key === "ArrowLeft") c = Math.max(0, c - 1);
+    if (e.key === "ArrowRight") c = Math.min(gridDim - 1, c + 1);
+    selectCell(r, c);
   }
 });
 
-document.addEventListener('change', (e) => {
-  if (e.target && e.target.id === 'difficulty-select') {
-    renderOrUpdateChart();
+function toggleTheme() {
+  document.body.classList.toggle("dark-theme");
+  const isDark = document.body.classList.contains("dark-theme");
+  document.getElementById("theme-btn").innerText = isDark ? "☀️ Light" : "🌙 Dark";
+  localStorage.setItem("sudoku_theme", isDark ? "dark" : "light");
+}
+
+function loadSettings() {
+  if (localStorage.getItem("sudoku_theme") === "dark") {
+    document.body.classList.add("dark-theme");
+    document.getElementById("theme-btn").innerText = "☀️ Light";
   }
-});
-        
+}
+
+function triggerVibration() {
+  const vibeEnabled = document.getElementById("vibe-toggle")?.checked;
+  if (vibeEnabled && navigator.vibrate) navigator.vibrate(200);
+}
+
+function installPWA() {}
+  
