@@ -1,3 +1,4 @@
+// Global State Variables
 let timerInterval = null;
 let secondsElapsed = 0;
 let isPaused = false;
@@ -31,7 +32,7 @@ let currentBoard = [];
 let initialMask = [];
 let cellNotes = [];
 
-// Audio Synthesizer
+// Dynamic Web Audio Synthesizer
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 function playSound(type) {
@@ -83,6 +84,7 @@ function triggerVibrate(ms = 30) {
   }
 }
 
+// App Initialization
 document.addEventListener('DOMContentLoaded', () => {
   setupKeyboardListeners();
   if (!loadGameState()) {
@@ -90,16 +92,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// Fixed Tab Switcher with Instant Chart Redraw
 function switchTab(tabId, btn) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
-  btn.classList.add('active');
+  
+  const targetView = document.getElementById(tabId);
+  if (targetView) targetView.classList.add('active');
+  if (btn) btn.classList.add('active');
 
-  if (tabId === 'status-view') {
+  // When switching to Status tab, force Chart.js to initialize/re-evaluate dimensions
+  if (tabId === 'status-view' || tabId === 'status-tab') {
     setTimeout(() => {
-      if (!performanceChart) initChart();
-      else { performanceChart.resize(); updateChart(); }
+      renderOrUpdateChart();
     }, 50);
   }
 }
@@ -108,7 +113,8 @@ function toggleTheme() {
   const current = document.body.getAttribute('data-theme');
   const next = current === 'dark' ? 'light' : 'dark';
   document.body.setAttribute('data-theme', next);
-  document.getElementById('theme-btn').innerText = next === 'dark' ? '☀️ Light' : '🌙 Dark';
+  const themeBtn = document.getElementById('theme-btn');
+  if (themeBtn) themeBtn.innerText = next === 'dark' ? '☀️ Light' : '🌙 Dark';
   saveGameState();
 }
 
@@ -122,19 +128,22 @@ function changeGridMode() {
 }
 
 function startNewGame() {
-  const diff = document.getElementById('difficulty').value;
-  hintsRemaining = hintRules[diff];
+  const diffSelect = document.getElementById('difficulty');
+  const diff = diffSelect ? diffSelect.value : 'medium';
+  hintsRemaining = hintRules[diff] ?? 3;
   maxMistakes = diff === 'expert' ? 2 : 3;
   mistakesCount = 0;
 
-  document.getElementById('hint-count').innerText = hintsRemaining;
-  document.getElementById('mistake-count').innerText = `0/${maxMistakes}`;
+  const hintEl = document.getElementById('hint-count');
+  const mistakeEl = document.getElementById('mistake-count');
+  if (hintEl) hintEl.innerText = hintsRemaining;
+  if (mistakeEl) mistakeEl.innerText = `0/${maxMistakes}`;
 
   secondsElapsed = 0;
   isPaused = false;
   
   const overlay = document.getElementById('game-overlay');
-  overlay.classList.remove('active');
+  if (overlay) overlay.classList.remove('active');
 
   generateLevel(diff);
   initBoardUI();
@@ -186,6 +195,7 @@ function hideCells(count) {
 
 function initBoardUI() {
   const container = document.getElementById('board-container');
+  if (!container) return;
   container.className = `board-container grid-${gridDimension}x${gridDimension}`;
   container.innerHTML = '<div class="overlay-screen" id="game-overlay"></div>';
 
@@ -211,6 +221,7 @@ function initBoardUI() {
 
 function renderNumpad() {
   const container = document.getElementById('numpad');
+  if (!container) return;
   container.innerHTML = '';
 
   for (let num = 1; num <= gridDimension; num++) {
@@ -224,7 +235,6 @@ function renderNumpad() {
   updateNumpadState();
 }
 
-// Block completed numbers and add checkmark (✓)
 function updateNumpadState() {
   for (let num = 1; num <= gridDimension; num++) {
     let count = 0;
@@ -340,7 +350,8 @@ function inputNumber(num) {
       mistakesCount++;
       playSound('error');
       triggerVibrate([50, 50, 100]);
-      document.getElementById('mistake-count').innerText = `${mistakesCount}/${maxMistakes}`;
+      const mistakeEl = document.getElementById('mistake-count');
+      if (mistakeEl) mistakeEl.innerText = `${mistakesCount}/${maxMistakes}`;
 
       if (mistakesCount >= maxMistakes) {
         triggerGameOver();
@@ -360,12 +371,15 @@ function triggerGameOver() {
   clearInterval(timerInterval);
   playSound('gameover');
   
-  const diff = document.getElementById('difficulty').value;
+  const diffSelect = document.getElementById('difficulty');
+  const diff = diffSelect ? diffSelect.value : 'medium';
   recordGameOutcome(diff, 'loss');
 
   const overlay = document.getElementById('game-overlay');
-  overlay.innerHTML = `<div>Game Over ❌</div><div style="font-size: 0.9rem; margin-top: 10px;">Too many mistakes made!</div>`;
-  overlay.classList.add('active');
+  if (overlay) {
+    overlay.innerHTML = `<div>Game Over ❌</div><div style="font-size: 0.9rem; margin-top: 10px;">Too many mistakes made!</div>`;
+    overlay.classList.add('active');
+  }
 
   setTimeout(() => {
     startNewGame();
@@ -382,12 +396,15 @@ function checkWinCondition() {
   clearInterval(timerInterval);
   playSound('win');
   
-  const diff = document.getElementById('difficulty').value;
+  const diffSelect = document.getElementById('difficulty');
+  const diff = diffSelect ? diffSelect.value : 'medium';
   recordGameOutcome(diff, 'win');
 
   const overlay = document.getElementById('game-overlay');
-  overlay.innerHTML = `<div>Victory! 🎉</div><div style="font-size: 0.9rem; margin-top: 10px;">Solved in ${secondsElapsed} seconds!</div>`;
-  overlay.classList.add('active');
+  if (overlay) {
+    overlay.innerHTML = `<div>Victory! 🎉</div><div style="font-size: 0.9rem; margin-top: 10px;">Solved in ${secondsElapsed} seconds!</div>`;
+    overlay.classList.add('active');
+  }
 }
 
 function eraseCell() {
@@ -409,8 +426,10 @@ function toggleNoteMode() {
   playSound('click');
   isNoteMode = !isNoteMode;
   const btn = document.getElementById('note-btn');
-  btn.innerText = `Note ✏️ (${isNoteMode ? 'ON' : 'OFF'})`;
-  btn.classList.toggle('active', isNoteMode);
+  if (btn) {
+    btn.innerText = `Note ✏️ (${isNoteMode ? 'ON' : 'OFF'})`;
+    btn.classList.toggle('active', isNoteMode);
+  }
 }
 
 function useHint() {
@@ -423,7 +442,8 @@ function useHint() {
   playSound('click');
   currentBoard[r][c] = currentSolution[r][c];
   hintsRemaining--;
-  document.getElementById('hint-count').innerText = hintsRemaining;
+  const hintEl = document.getElementById('hint-count');
+  if (hintEl) hintEl.innerText = hintsRemaining;
   renderBoard();
   checkWinCondition();
   saveGameState();
@@ -436,7 +456,8 @@ function startTimer() {
       secondsElapsed++;
       const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
       const secs = String(secondsElapsed % 60).padStart(2, '0');
-      document.getElementById('timer').innerText = `${mins}:${secs}`;
+      const timerEl = document.getElementById('timer');
+      if (timerEl) timerEl.innerText = `${mins}:${secs}`;
     }
   }, 1000);
 }
@@ -448,12 +469,14 @@ function togglePause() {
   const btn = document.getElementById('pause-btn');
 
   if (isPaused) {
-    overlay.innerText = 'Game Paused ⏸️';
-    overlay.classList.add('active');
-    btn.innerText = 'Resume ▶️';
+    if (overlay) {
+      overlay.innerText = 'Game Paused ⏸️';
+      overlay.classList.add('active');
+    }
+    if (btn) btn.innerText = 'Resume ▶️';
   } else {
-    overlay.classList.remove('active');
-    btn.innerText = 'Pause ⏸️';
+    if (overlay) overlay.classList.remove('active');
+    if (btn) btn.innerText = 'Pause ⏸️';
   }
   saveGameState();
 }
@@ -478,14 +501,16 @@ function setupKeyboardListeners() {
   });
 }
 
-// Win/Loss Rating Tracking Logic per Difficulty
+// Rating History Manager (Wins +100, Losses -50)
 function recordGameOutcome(difficulty, result) {
   const ratings = JSON.parse(localStorage.getItem('sudoku_ratings') || '{}');
-  if (!ratings[difficulty]) {
-    ratings[difficulty] = [1000];
+  const key = difficulty.toLowerCase();
+  
+  if (!ratings[key]) {
+    ratings[key] = [1000];
   }
   
-  const currentDiffRatings = ratings[difficulty];
+  const currentDiffRatings = ratings[key];
   const lastScore = currentDiffRatings[currentDiffRatings.length - 1];
 
   let newScore = lastScore;
@@ -496,13 +521,14 @@ function recordGameOutcome(difficulty, result) {
   }
 
   currentDiffRatings.push(newScore);
-  ratings[difficulty] = currentDiffRatings;
+  ratings[key] = currentDiffRatings;
   localStorage.setItem('sudoku_ratings', JSON.stringify(ratings));
 
-  if (performanceChart) updateChart();
+  renderOrUpdateChart();
 }
 
 function saveGameState() {
+  const diffSelect = document.getElementById('difficulty');
   const state = {
     gridDimension,
     secondsElapsed,
@@ -515,7 +541,7 @@ function saveGameState() {
     initialMask,
     soundEnabled,
     vibeEnabled,
-    difficulty: document.getElementById('difficulty').value,
+    difficulty: diffSelect ? diffSelect.value : 'medium',
     theme: document.body.getAttribute('data-theme') || 'light',
     cellNotes: cellNotes.map(set => Array.from(set))
   };
@@ -536,20 +562,28 @@ function loadGameState() {
     currentBoard = state.currentBoard;
     currentSolution = state.currentSolution;
     initialMask = state.initialMask || Array.from({ length: gridDimension }, () => Array(gridDimension).fill(false));
-    cellNotes = state.cellNotes.map(arr => new Set(arr));
+    cellNotes = state.cellNotes ? state.cellNotes.map(arr => new Set(arr)) : [];
     soundEnabled = state.soundEnabled ?? true;
     vibeEnabled = state.vibeEnabled ?? true;
 
-    document.getElementById('sound-toggle').checked = soundEnabled;
-    document.getElementById('vibe-toggle').checked = vibeEnabled;
-    document.getElementById('grid-size').value = `${gridDimension}x${gridDimension}`;
-    document.getElementById('difficulty').value = state.difficulty || 'medium';
-    document.getElementById('hint-count').innerText = hintsRemaining;
-    document.getElementById('mistake-count').innerText = `${mistakesCount}/${maxMistakes}`;
+    const soundToggle = document.getElementById('sound-toggle');
+    const vibeToggle = document.getElementById('vibe-toggle');
+    const gridSizeSelect = document.getElementById('grid-size');
+    const diffSelect = document.getElementById('difficulty');
+    const hintEl = document.getElementById('hint-count');
+    const mistakeEl = document.getElementById('mistake-count');
+
+    if (soundToggle) soundToggle.checked = soundEnabled;
+    if (vibeToggle) vibeToggle.checked = vibeEnabled;
+    if (gridSizeSelect) gridSizeSelect.value = `${gridDimension}x${gridDimension}`;
+    if (diffSelect) diffSelect.value = state.difficulty || 'medium';
+    if (hintEl) hintEl.innerText = hintsRemaining;
+    if (mistakeEl) mistakeEl.innerText = `${mistakesCount}/${maxMistakes}`;
 
     if (state.theme === 'dark') {
       document.body.setAttribute('data-theme', 'dark');
-      document.getElementById('theme-btn').innerText = '☀️ Light';
+      const themeBtn = document.getElementById('theme-btn');
+      if (themeBtn) themeBtn.innerText = '☀️ Light';
     }
 
     initBoardUI();
@@ -569,43 +603,52 @@ function clearSavedData() {
   startNewGame();
 }
 
-// Chart.js initialization with Difficulty Level Switch support
-function initChart() {
-  const ctx = document.getElementById('performanceChart').getContext('2d');
-  
-  performanceChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        label: 'Skill Score Rating',
-        data: [],
-        borderColor: '#3498db',
-        borderWidth: 3,
-        tension: 0.3,
-        fill: true,
-        backgroundColor: 'rgba(52, 152, 219, 0.15)'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
+// Fixed Chart Initialization & Dynamic Updating Logic
+function renderOrUpdateChart() {
+  const canvas = document.getElementById('performanceChart') || document.getElementById('analyticsChart');
+  if (!canvas || typeof Chart === 'undefined') return;
 
-  updateChart();
-}
+  const ctx = canvas.getContext('2d');
+  const diffSelect = document.getElementById('chart-difficulty') || document.getElementById('difficulty-select');
+  const difficulty = diffSelect ? diffSelect.value.toLowerCase() : 'medium';
 
-function updateChart() {
-  if (!performanceChart) return;
-
-  const diff = document.getElementById('chart-difficulty').value;
   const ratings = JSON.parse(localStorage.getItem('sudoku_ratings') || '{}');
-  const diffData = ratings[diff] || [1000];
-
+  const diffData = ratings[difficulty] || [1000, 1000]; // Guarantees baseline rendering even if 0 games played
   const labels = diffData.map((_, i) => i === 0 ? 'Start' : `Game #${i}`);
 
-  performanceChart.data.labels = labels;
-  performanceChart.data.datasets[0].data = diffData;
-  performanceChart.update();
+  if (performanceChart) {
+    performanceChart.data.labels = labels;
+    performanceChart.data.datasets[0].data = diffData;
+    performanceChart.update();
+    performanceChart.resize(); // Fixes hidden tab 0px height issue
+  } else {
+    performanceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Skill Score Rating',
+          data: diffData,
+          borderColor: '#3498db',
+          borderWidth: 3,
+          tension: 0.3,
+          fill: true,
+          backgroundColor: 'rgba(52, 152, 219, 0.15)'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: false
+          }
+        }
+      }
+    });
+  }
 }
+
+// Event listener for Status view difficulty selector change
+document.addEventListener('change', (e) => {
+ 
