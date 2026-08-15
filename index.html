@@ -140,26 +140,23 @@ href="https://jadhaojay74-coder.github.io/sudoku-app-/">
     </section>
 
     <!-- Status View -->
-    <section id="status-view" class="view">
-      <div class="card">
-        <h2>Performance Analytics 📈</h2>
-        <p class="subtitle">Score rating increases on Win and drops on Loss.</p>
-        
-        <div class="analytics-filter">
-          <label for="chart-difficulty">Difficulty: </label>
-          <select id="chart-difficulty" onchange="updateChart()">
-            <option value="simple">Simple</option>
-            <option value="medium" selected>Medium</option>
-            <option value="hard">Hard</option>
-            <option value="expert">Expert</option>
-          </select>
-        </div>
+    <div id="status-tab" class="tab-content">
+  <h2>Performance Analytics 📈</h2>
+  <p>Score rating increases on Win and drops on Loss.</p>
 
-        <div class="chart-wrapper">
-          <canvas id="performanceChart"></canvas>
-        </div>
-      </div>
-    </section>
+  <label for="difficulty-select">Difficulty:</label>
+  <select id="difficulty-select">
+    <option value="Simple">Simple</option>
+    <option value="Medium" selected>Medium</option>
+    <option value="Hard">Hard</option>
+    <option value="Expert">Expert</option>
+  </select>
+
+  <!-- Canvas wrapper with non-zero container -->
+  <div class="chart-container">
+    <canvas id="analyticsChart"></canvas>
+  </div>
+    </div>
 
     <!-- Settings View -->
     <section id="settings-view" class="view">
