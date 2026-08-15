@@ -55,138 +55,127 @@ href="https://jadhaojay74-coder.github.io/sudoku-app-/">
 </head>
 <body>
 
-<canvas id="confetti-canvas"></canvas>
-
-<div class="container">
+  <!-- Header Navigation -->
   <header>
-    <h1>Sudoku </h1>
+    <div class="brand">
+      <span class="logo-icon">🧩</span>
+      <span class="logo-text">Sudoku Master</span>
+    </div>
+
+    <nav class="nav-links">
+      <button class="nav-btn active" onclick="switchTab('game-view', this)">Play</button>
+      <button class="nav-btn" onclick="switchTab('status-view', this)">Status 📉</button>
+      <button class="nav-btn" onclick="switchTab('settings-view', this)">Settings</button>
+    </nav>
+
     <div class="header-actions">
-      <span class="streak-badge" id="streak-display">🔥 0</span>
-      <button class="theme-btn" id="theme-toggle">🌙 Dark</button>
+      <button class="install-btn" id="install-btn" onclick="installPWA()">📲 Install</button>
+      <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dark</button>
     </div>
   </header>
 
-  <div class="status-bar">
-    <div class="status-item">
-      <span>Variant:</span>
-      <select id="variant-select">
-        <option value="classic">Classic 9x9</option>
-        <option value="diagonal">Sudoku X (Diagonal)</option>
-        <option value="mini">Mini 6x6</option>
-        <option value="hyper">Hyper (Windoku)</option>
-      </select>
-    </div>
-    <div class="status-item">
-      <span>Diff:</span>
-      <select id="difficulty">
-        <option value="easy">Easy</option>
-        <option value="medium" selected>Medium</option>
-        <option value="hard">Hard</option>
-      </select>
-    </div>
-  </div>
+  <main class="container">
+    <!-- Game View -->
+    <section id="game-view" class="view active">
+      <div class="game-header">
+        <div class="select-group">
+          <select id="grid-size" onchange="changeGridMode()">
+            <option value="9x9" selected>9×9 Classic (Digits 1-9)</option>
+            <option value="3x3">3×3 Mini (Digits 1-3)</option>
+          </select>
 
-  <div class="status-bar">
-    <div class="status-item" id="mistakes-wrapper">
-      <span>Mistakes:</span>
-      <strong id="mistakes-count" class="mistake-text">0/3</strong>
-    </div>
-    <div class="status-item" id="timer-wrapper">
-      <span>Time:</span>
-      <strong id="timer">00:00</strong>
-    </div>
-  </div>
+          <select id="difficulty" onchange="startNewGame()">
+            <option value="simple">Simple</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert (2 Mistakes Max)</option>
+          </select>
+        </div>
 
-  <div class="multiplayer-bar" id="multiplayer-bar" style="display: none;">
-    <div class="p-tracker">
-      <span>You: <strong id="my-progress">0%</strong></span>
-      <div class="p-bar-bg"><div class="p-bar-fill" id="my-bar" style="width:0%"></div></div>
-    </div>
-    <div class="p-tracker">
-      <span>Opponent: <strong id="opp-progress">0%</strong></span>
-      <div class="p-bar-bg"><div class="p-bar-fill opp" id="opp-bar" style="width:0%"></div></div>
-    </div>
-  </div>
+        <div class="stats-group">
+          <div class="stat-badge">⏱️ <span id="timer">00:00</span></div>
+          <div class="stat-badge danger-text">❌ <span id="mistake-count">0/3</span></div>
+          <div class="stat-badge">💡 Hints: <span id="hint-count">3</span></div>
+        </div>
+      </div>
 
-  <div class="game-mode-banner" id="game-mode-banner">Standard Practice Game</div>
+      <!-- Sudoku Board Wrapper -->
+      <div class="board-wrapper">
+        <div class="board-container grid-9x9" id="board-container">
+          <div class="overlay-screen" id="game-overlay"></div>
+        </div>
+      </div>
 
-  <div class="board-wrapper">
-    <div class="board" id="board"></div>
-    <div class="pause-overlay" id="pause-overlay">PAUSED</div>
-  </div>
+      <!-- Controls Grid -->
+      <div class="controls-grid">
+        <button class="btn btn-primary" onclick="startNewGame()">New Game 🔄</button>
+        <button class="btn" onclick="togglePause()" id="pause-btn">Pause ⏸️</button>
+        <button class="btn" onclick="toggleNoteMode()" id="note-btn">Note ✏️ (OFF)</button>
+        <button class="btn" onclick="useHint()" id="hint-btn">Hint 💡</button>
+        <button class="btn" onclick="eraseCell()">Erase 🧽</button>
+      </div>
 
-  <div class="action-buttons">
-    <button class="btn" id="btn-pause">Pause</button>
-    <button class="btn" id="btn-notes">Notes (OFF)</button>
-    <button class="btn" id="btn-auto-notes">🪄 Auto-Notes</button>
-    <button class="btn" id="btn-undo">Undo (2)</button>
-    <button class="btn" id="btn-hint">Hint (2)</button>
-    <button class="btn" id="btn-erase">Erase</button>
-    <button class="btn" id="btn-zen">🧘 Zen Mode</button>
-    <button class="btn btn-multi" id="btn-multiplayer">⚔️ 1v1 Race</button>
-    <button class="btn btn-secondary" id="btn-daily">Calendar</button>
-    <button class="btn btn-secondary" id="btn-stats">Stats</button>
-    <button class="btn btn-secondary" id="btn-new">New Game</button>
-  </div>
+      <!-- Numpad -->
+      <div class="numpad" id="numpad"></div>
 
-  <div class="keypad" id="keypad"></div>
-</div>
+      <div class="keyboard-info">
+        💡 <b>Keyboard:</b> <kbd>Arrows</kbd> Move | <kbd>1-9</kbd> Enter Number | <kbd>Backspace</kbd> Erase | <kbd>N</kbd> Pencil Note | <kbd>P</kbd> Pause
+      </div>
+    </section>
 
-<div class="modal-overlay" id="mp-modal">
-  <div class="modal-content">
-    <h2>⚔️ 1v1 Live Race</h2>
-    <p style="font-size: 0.85rem; opacity: 0.8;">Race a friend to see who solves the same puzzle first!</p>
+    <!-- Status View -->
+    <section id="status-view" class="view">
+      <div class="card">
+        <h2>Performance Analytics 📈</h2>
+        <p class="subtitle">Score rating increases on Win and drops on Loss.</p>
+        
+        <div class="analytics-filter">
+          <label for="chart-difficulty">Difficulty: </label>
+          <select id="chart-difficulty" onchange="updateChart()">
+            <option value="simple">Simple</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+          </select>
+        </div>
+
+        <div class="chart-wrapper">
+          <canvas id="performanceChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings View -->
+    <section id="settings-view" class="view">
+      <div class="card">
+        <h2>Game Settings ⚙️</h2>
+        
+        <div class="setting-row">
+          <span>🔊 Sound Effects</span>
+          <label class="switch">
+            <input type="checkbox" id="sound-toggle" onchange="toggleSoundSetting(this.checked)" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <span>📳 Haptic Vibration</span>
+          <label class="switch">
+            <input type="checkbox" id="vibe-toggle" onchange="toggleVibeSetting(this.checked)" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <hr />
+
+        <div class="settings-actions">
+          <button class="btn btn-danger" onclick="clearSavedData()">🗑️ Reset Memory & Stats</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+  </body>
     
-    <div class="mp-box">
-      <h4>Create Room</h4>
-      <p style="font-size:0.75rem;">Your Room Code:</p>
-      <div class="code-display" id="my-peer-id">Generating...</div>
-      <button class="btn" id="btn-copy-code">📋 Copy Code</button>
-    </div>
-
-    <hr class="modal-divider">
-
-    <div class="mp-box">
-      <h4>Join Room</h4>
-      <input type="text" id="join-room-input" placeholder="Enter Room Code..." class="mp-input">
-      <button class="btn btn-secondary" id="btn-join-room" style="margin-top: 6px;">Connect & Race</button>
-    </div>
-
-    <button class="btn modal-btn" id="mp-close-btn">Cancel</button>
-  </div>
-</div>
-
-<div class="modal-overlay" id="game-modal">
-  <div class="modal-content">
-    <h2 id="modal-title">Game Over</h2>
-    <p id="modal-message">Result text here</p>
-    <button class="btn modal-btn" id="modal-close-btn">Play Again</button>
-  </div>
-</div>
-
-<div class="modal-overlay" id="calendar-modal">
-  <div class="modal-content">
-    <div class="calendar-header">
-      <button class="btn btn-secondary" id="cal-prev-month">&lt;</button>
-      <h3 id="calendar-month-title">Calendar</h3>
-      <button class="btn btn-secondary" id="cal-next-month">&gt;</button>
-    </div>
-    <div class="calendar-grid" id="calendar-grid"></div>
-    <button class="btn modal-btn" id="calendar-close-btn">Close</button>
-  </div>
-</div>
-
-<div class="modal-overlay" id="stats-modal">
-  <div class="modal-content">
-    <h2>Statistics</h2>
-    <div class="stats-grid">
-      <div class="stat-card"><span class="stat-number" id="stat-played">0</span><span class="stat-label">Played</span></div>
-      <div class="stat-card"><span class="stat-number" id="stat-won">0</span><span class="stat-label">Won</span></div>
-    </div>
-    <button class="btn modal-btn" id="stats-close-btn">Close</button>
-  </div>
-</div>
-
-<script src="script.js"></script>
-</body>
 </html>
