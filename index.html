@@ -3,55 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Sudoku Master Ultimate - Play Classic, Variants & Multiplayer</title>
+  <title>Sudoku Master Ultimate</title>
   
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧩</text></svg>">
   <link rel="stylesheet" href="styles.css">
 
-  <meta name="description" content="Play free online Sudoku with 5 grid sizes (4x4 to 16x16), Alphabet & Standard variants, real-time analytics, notes, and dark mode.">
-  <meta name="keywords" content="Sudoku, Sudoku game, Free Sudoku, Online Sudoku, Daily Sudoku, Puzzle, Monster Sudoku, Alphabet Sudoku">
-  <meta name="author" content="Jay Jadhao">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://jadhaojay74-coder.github.io/sudoku-app-/">
-
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
-
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://jadhaojay74-coder.github.io/sudoku-app-/">
-  <meta property="og:title" content="Sudoku Master Ultimate - Free Online Sudoku & Variants">
-  <meta property="og:description" content="Solve 5 unique grid modes from 4x4 Mini to 16x16 Monster with auto-notes and real-time tracking!">
-  <meta property="og:image" content="https://jadhaojay74-coder.github.io/sudoku-app-/assets/og-preview.png">
-
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:url" content="https://jadhaojay74-coder.github.io/sudoku-app-/">
-  <meta name="twitter:title" content="Sudoku Master Ultimate">
-  <meta name="twitter:description" content="Solve 5 unique grid modes from 4x4 Mini to 16x16 Monster with auto-notes and real-time tracking!">
-
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Sudoku Master">
-
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <script>
-    const manifest = {
-      name: "Sudoku Master Pro",
-      short_name: "Sudoku",
-      start_url: "./",
-      display: "standalone",
-      background_color: "#0f172a",
-      theme_color: "#3b82f6",
-      icons: [{ src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>", sizes: "192x192 512x512", type: "image/svg+xml" }]
-    };
-    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-    const link = document.createElement('link');
-    link.rel = 'manifest';
-    link.href = URL.createObjectURL(blob);
-    document.head.appendChild(link);
-  </script>
 </head>
 <body>
 
@@ -79,7 +36,7 @@
     <section id="game-view" class="view active">
       <div class="game-header">
         <div class="select-group">
-          <select id="grid-size" onchange="changeGridMode()">
+          <select id="grid-size">
             <option value="4x4">4×4 Mini</option>
             <option value="6x6">6×6 Medium</option>
             <option value="9x9" selected>9×9 Classic</option>
@@ -87,12 +44,12 @@
             <option value="16x16">16×16 Monster</option>
           </select>
 
-          <select id="variant-type" onchange="changeVariantMode()">
+          <select id="variant-type">
             <option value="classic" selected>Standard Numbers</option>
             <option value="alphabet">Alphabet</option>
           </select>
 
-          <select id="difficulty" onchange="startNewGame()">
+          <select id="difficulty">
             <option value="simple">Simple</option>
             <option value="medium" selected>Medium</option>
             <option value="hard">Hard</option>
@@ -112,20 +69,20 @@
         <div class="board-container grid-9x9" id="board-container"></div>
       </div>
 
-      <!-- Controls Grid -->
+      <!-- Action Controls -->
       <div class="controls-grid">
-        <button class="btn" onclick="startNewGame()">New 🔄</button>
-        <button class="btn" id="pause-btn" onclick="togglePause()">Pause ⏸️</button>
-        <button class="btn" id="note-btn" onclick="toggleNoteMode()">Notes OFF</button>
-        <button class="btn" id="hint-btn" onclick="getHint()">Hint 💡</button>
-        <button class="btn" id="erase-btn" onclick="eraseCell()">Erase 🧽</button>
+        <button class="btn" id="new-game-btn">New 🔄</button>
+        <button class="btn" id="pause-btn">Pause ⏸️</button>
+        <button class="btn" id="note-btn">Notes OFF</button>
+        <button class="btn" id="hint-btn">Hint 💡</button>
+        <button class="btn" id="erase-btn">Erase 🧽</button>
       </div>
 
       <!-- Keypad -->
       <div class="numpad" id="numpad"></div>
 
       <div class="keyboard-info">
-        💡 <b>Keyboard:</b> <kbd>Arrows</kbd> Move | <kbd>1-9 / A-P</kbd> Enter Value | <kbd>Backspace</kbd> Erase | <kbd>N</kbd> Notes Toggle
+        💡 <b>Keyboard:</b> <kbd>Arrows</kbd> Move | <kbd>1-9 / A-P</kbd> Enter Value | <kbd>Backspace</kbd> Erase | <kbd>N</kbd> Notes
       </div>
     </section>
 
@@ -134,7 +91,7 @@
       <div class="tab-content">
         <h2>Performance Analytics 📈</h2>
         <p style="margin-top: 4px; color: var(--text-muted); font-size: 0.85rem;">
-          Rating reflects win ratios and average solving speeds per difficulty level.
+          Track your average completion times and win rates.
         </p>
 
         <div class="setting-row" style="margin-top: 12px;">
@@ -162,7 +119,7 @@
         <div class="setting-row">
           <span>Dark Mode Theme</span>
           <label class="switch">
-            <input type="checkbox" id="theme-switch" onchange="document.getElementById('theme-btn').click()">
+            <input type="checkbox" id="theme-switch">
             <span class="slider"></span>
           </label>
         </div>
@@ -183,17 +140,9 @@
           </label>
         </div>
 
-        <div class="setting-row">
-          <span>Highlight Conflicts</span>
-          <label class="switch">
-            <input type="checkbox" id="conflict-toggle" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-
         <hr style="border: 0; border-top: 1px solid var(--border-light);" />
 
-        <button class="btn-danger" onclick="startNewGame()">🗑️ Reset Game Memory & Stats</button>
+        <button class="btn-danger" id="reset-data-btn">🗑️ Reset Memory & Stats</button>
       </div>
     </section>
 
