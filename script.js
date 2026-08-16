@@ -22,13 +22,13 @@ let timerSeconds = 0;
 let timerInterval = null;
 let analyticsChartInstance = null;
 
-// Persistent Real Scores Storage
-let gameStats = JSON.parse(localStorage.getItem("sudoku_best_times")) || {
-  "4x4": { simple: null, medium: null, hard: null, expert: null },
-  "6x6": { simple: null, medium: null, hard: null, expert: null },
-  "9x9": { simple: null, medium: null, hard: null, expert: null },
-  "12x12": { simple: null, medium: null, hard: null, expert: null },
-  "16x16": { simple: null, medium: null, hard: null, expert: null }
+// Persistent Real Game Stats - Stores arrays of finish times to compute averages
+let gameStats = JSON.parse(localStorage.getItem("sudoku_avg_times")) || {
+  "4x4": { simple: [], medium: [], hard: [], expert: [] },
+  "6x6": { simple: [], medium: [], hard: [], expert: [] },
+  "9x9": { simple: [], medium: [], hard: [], expert: [] },
+  "12x12": { simple: [], medium: [], hard: [], expert: [] },
+  "16x16": { simple: [], medium: [], hard: [], expert: [] }
 };
 
 const ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function saveStats() {
-  localStorage.setItem("sudoku_best_times", JSON.stringify(gameStats));
+  localStorage.setItem("sudoku_avg_times", JSON.stringify(gameStats));
 }
 
 /* --- Sound & Haptic Feedback System --- */
@@ -126,7 +126,6 @@ function setupEventListeners() {
   document.getElementById("theme-switch")?.addEventListener("change", (e) => setTheme(e.target.checked));
   document.getElementById("reset-data-btn")?.addEventListener("click", resetData);
 
-  // Status Filter Change
   const statusFilter = document.querySelector("#status-view select");
   if (statusFilter) {
     statusFilter.addEventListener("change", initAnalyticsChart);
@@ -420,7 +419,7 @@ function renderNumpad() {
   });
 }
 
-/* --- Input & Hint Actions --- */
+/* --- Input & Actions --- */
 
 function handleCellClick(r, c) {
   if (isPaused) return;
@@ -569,17 +568,17 @@ function checkWinCondition() {
   playSound("win");
   triggerVibration([100, 50, 100, 50, 200]);
 
-  // Record Best Time to Storage
+  // Record Completion Time for Average Calculation
   const modeKey = `${gridDim}x${gridDim}`;
   if (!gameStats[modeKey]) {
-    gameStats[modeKey] = { simple: null, medium: null, hard: null, expert: null };
+    gameStats[modeKey] = { simple: [], medium: [], hard: [], expert: [] };
+  }
+  if (!Array.isArray(gameStats[modeKey][currentDifficulty])) {
+    gameStats[modeKey][currentDifficulty] = [];
   }
   
-  const bestTime = gameStats[modeKey][currentDifficulty];
-  if (bestTime === null || timerSeconds < bestTime) {
-    gameStats[modeKey][currentDifficulty] = timerSeconds;
-    saveStats();
-  }
+  gameStats[modeKey][currentDifficulty].push(timerSeconds);
+  saveStats();
 
   showOverlay("Congratulations!", `Solved in ${document.getElementById("timer")?.innerText || ""}`);
 }
@@ -644,20 +643,20 @@ function hideOverlay() {
 function resetData() {
   if (confirm("Reset current game session and statistics?")) {
     playSound("click");
-    localStorage.removeItem("sudoku_best_times");
+    localStorage.removeItem("sudoku_avg_times");
     gameStats = {
-      "4x4": { simple: null, medium: null, hard: null, expert: null },
-      "6x6": { simple: null, medium: null, hard: null, expert: null },
-      "9x9": { simple: null, medium: null, hard: null, expert: null },
-      "12x12": { simple: null, medium: null, hard: null, expert: null },
-      "16x16": { simple: null, medium: null, hard: null, expert: null }
+      "4x4": { simple: [], medium: [], hard: [], expert: [] },
+      "6x6": { simple: [], medium: [], hard: [], expert: [] },
+      "9x9": { simple: [], medium: [], hard: [], expert: [] },
+      "12x12": { simple: [], medium: [], hard: [], expert: [] },
+      "16x16": { simple: [], medium: [], hard: [], expert: [] }
     };
     initAnalyticsChart();
     startNewGame();
   }
 }
 
-/* --- Real Analytics Chart Initialization --- */
+/* --- Real Analytics Chart Initialization (Average Time) --- */
 
 function initAnalyticsChart() {
   const ctx = document.getElementById("analyticsChart");
@@ -670,8 +669,8 @@ function initAnalyticsChart() {
   const statusFilter = document.querySelector("#status-view select");
   let filterVal = statusFilter ? statusFilter.value : `${gridDim}x${gridDim}`;
   
-  // Normalize selection text if needed
   if (filterVal.includes("4x4")) filterVal = "4x4";
   else if (filterVal.includes("6x6")) filterVal = "6x6";
   else if (filterVal.includes("9x9")) filterVal = "9x9";
-  else if (filterVa
+  else if (filterVal.includes("12x12")) filterVal = "12x12";
+  else if (filterVal.includes("16x16"))
