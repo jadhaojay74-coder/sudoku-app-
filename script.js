@@ -7,26 +7,47 @@ let solutionGrid = [];
 let initialGrid = [];
 let userGrid = [];
 let notesGrid = [];
-let evenOddMask = [];
 
 let symbols = [];
 let selectedCell = null;
-let activeNumber = null; // Stores number selected from keypad first
-let noteMode = false;
+let activeNumber = null;
+let isNoteMode = false;
 let isPaused = false;
-let timerInterval = null;
-let secondsElapsed = 0;
+
 let mistakes = 0;
-let maxMistakes = 3;
-let hintsRemaining = 3;
+const MAX_MISTAKES = 3;
+let timerSeconds = 0;
+let timerInterval = null;
 
 const ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
 
 document.addEventListener("DOMContentLoaded", () => {
-  loadSettings();
+  setupNavigation();
   setupVariantControls();
+  setupActionButtons();
+  setupThemeToggle();
+  setupKeyboardInput();
   startNewGame();
 });
+
+/* --- UI Navigation & Setup --- */
+
+function setupNavigation() {
+  const navBtns = document.querySelectorAll(".nav-btn");
+  const views = document.querySelectorAll(".view");
+
+  navBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const targetView = btn.dataset.target;
+      navBtns.forEach(b => b.classList.remove("active"));
+      views.forEach(v => v.classList.remove("active"));
+
+      btn.classList.add("active");
+      const activeView = document.getElementById(targetView);
+      if (activeView) activeView.classList.add("active");
+    });
+  });
+}
 
 function setupVariantControls() {
   const selectGroup = document.querySelector(".select-group");
@@ -42,22 +63,36 @@ function setupVariantControls() {
     </select>
 
     <select id="variant-type" onchange="changeVariantMode()">
-      <option value="classic" selected>Standard</option>
-      <option value="diagonal">Diagonal (Sudoku X)</option>
-      <option value="hyper">Hyper (Windoku)</option>
-      <option value="non-consecutive">Non-Consecutive</option>
-      <option value="even-odd">Even / Odd</option>
+      <option value="classic" selected>Standard Numbers</option>
       <option value="alphabet">Alphabet</option>
-    </select>
-
-    <select id="difficulty" onchange="startNewGame()">
-      <option value="simple">Simple</option>
-      <option value="medium" selected>Medium</option>
-      <option value="hard">Hard</option>
-      <option value="expert">Expert</option>
     </select>
   `;
 }
+
+function setupActionButtons() {
+  const controlsGrid = document.querySelector(".controls-grid");
+  if (!controlsGrid) return;
+
+  controlsGrid.innerHTML = `
+    <button class="btn" onclick="startNewGame()">New</button>
+    <button class="btn" id="pause-btn" onclick="togglePause()">Pause</button>
+    <button class="btn" id="note-btn" onclick="toggleNoteMode()">Notes OFF</button>
+    <button class="btn" onclick="getHint()">Hint</button>
+    <button class="btn" onclick="eraseCell()">Erase</button>
+  `;
+}
+
+function setupThemeToggle() {
+  const toggleBtn = document.querySelector(".theme-toggle");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark-theme");
+      toggleBtn.innerText = document.body.classList.contains("dark-theme") ? "☀️" : "🌙";
+    });
+  }
+}
+
+/* --- Mode Switchers --- */
 
 function changeGridMode() {
   const mode = document.getElementById("grid-size").value;
@@ -78,63 +113,73 @@ function changeVariantMode() {
 }
 
 function updateSymbols() {
-  if (currentVariant === "alphabet") {
-    symbols = ALPHABET.slice(0, gridDim);
-  } else {
-    symbols = Array.from({ length: gridDim }, (_, i) => i + 1);
-  }
-  updateKeyboardGuide();
+  symbols = currentVariant === "alphabet" 
+    ? ALPHABET.slice(0, gridDim) 
+    : Array.from({ length: gridDim }, (_, i) => String(i + 1));
 }
 
-function updateKeyboardGuide() {
-  const guide = document.getElementById("keyboard-info");
-  if (!guide) return;
-  const symRange = currentVariant === "alphabet" ? `A-${symbols[symbols.length - 1]}` : `1-${gridDim}`;
-  guide.innerHTML = `💡 <b>Keyboard:</b> Direct click number first or select cell | <kbd>${symRange}</kbd> Input | <kbd>N</kbd> Notes`;
-}
+/* --- Core Game Initialization --- */
 
 function startNewGame() {
-  const diff = document.getElementById("difficulty").value;
-  maxMistakes = diff === "expert" ? 2 : 3;
-  mistakes = 0;
-  hintsRemaining = 3;
-  secondsElapsed = 0;
-  isPaused = false;
   selectedCell = null;
   activeNumber = null;
+  isNoteMode = false;
+  isPaused = false;
+  mistakes = 0;
 
-  document.getElementById("mistake-count").innerText = `${mistakes}/${maxMistakes}`;
-  document.getElementById("hint-count").innerText = hintsRemaining;
-  document.getElementById("game-overlay").classList.remove("active");
+  const noteBtn = document.getElementById("note-btn");
+  if (noteBtn) {
+    noteBtn.innerText = "Notes OFF";
+    noteBtn.classList.remove("active-mode");
+  }
 
+  updateMistakesDisplay();
+  resetTimer();
   updateSymbols();
-  generatePuzzle(diff);
+  generatePuzzle();
   renderBoard();
   renderNumpad();
-  resetTimer();
+  hideOverlay();
 }
 
-function generatePuzzle(diff) {
-  solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
-  evenOddMask = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
-
-  fillGrid(solutionGrid);
-
-  for (let r = 0; r < gridDim; r++) {
-    for (let c = 0; c < gridDim; c++) {
-      if (typeof solutionGrid[r][c] === "number") {
-        evenOddMask[r][c] = solutionGrid[r][c] % 2 === 0 ? "E" : "O";
-      }
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerSeconds = 0;
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    if (!isPaused) {
+      timerSeconds++;
+      updateTimerDisplay();
     }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const timerElem = document.getElementById("timer");
+  if (!timerElem) return;
+  const mins = String(Math.floor(timerSeconds / 60)).padStart(2, "0");
+  const secs = String(timerSeconds % 60).padStart(2, "0");
+  timerElem.innerText = `${mins}:${secs}`;
+}
+
+function updateMistakesDisplay() {
+  const mistakeElem = document.getElementById("mistakes");
+  if (mistakeElem) {
+    mistakeElem.innerText = `${mistakes}/${MAX_MISTAKES}`;
   }
+}
+
+/* --- Puzzle Generator & Solver --- */
+
+function generatePuzzle() {
+  solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
+  fillGrid(solutionGrid);
 
   initialGrid = solutionGrid.map(row => [...row]);
   userGrid = solutionGrid.map(row => [...row]);
-  notesGrid = Array.from({ length: gridDim }, () => Array.from({ length: gridDim }, () => []));
+  notesGrid = Array.from({ length: gridDim }, () => Array.from({ length: gridDim }, () => new Set()));
 
-  let removalRatio = diff === "simple" ? 0.35 : diff === "medium" ? 0.5 : diff === "hard" ? 0.62 : 0.7;
-  let holes = Math.floor(gridDim * gridDim * removalRatio);
-
+  let holes = Math.floor(gridDim * gridDim * 0.52);
   while (holes > 0) {
     let r = Math.floor(Math.random() * gridDim);
     let c = Math.floor(Math.random() * gridDim);
@@ -150,7 +195,7 @@ function fillGrid(grid) {
   for (let r = 0; r < gridDim; r++) {
     for (let c = 0; c < gridDim; c++) {
       if (grid[r][c] === 0) {
-        let shuffleSyms = shuffle([...symbols]);
+        let shuffleSyms = [...symbols].sort(() => Math.random() - 0.5);
         for (let sym of shuffleSyms) {
           if (isValidPlacement(grid, r, c, sym)) {
             grid[r][c] = sym;
@@ -169,7 +214,6 @@ function isValidPlacement(grid, row, col, val) {
   for (let i = 0; i < gridDim; i++) {
     if (grid[row][i] === val || grid[i][col] === val) return false;
   }
-
   let startR = Math.floor(row / boxRows) * boxRows;
   let startC = Math.floor(col / boxCols) * boxCols;
   for (let r = 0; r < boxRows; r++) {
@@ -177,37 +221,17 @@ function isValidPlacement(grid, row, col, val) {
       if (grid[startR + r][startC + c] === val) return false;
     }
   }
-
-  if (currentVariant === "diagonal") {
-    if (row === col) {
-      for (let i = 0; i < gridDim; i++) if (grid[i][i] === val) return false;
-    }
-    if (row + col === gridDim - 1) {
-      for (let i = 0; i < gridDim; i++) if (grid[i][gridDim - 1 - i] === val) return false;
-    }
-  }
-
-  if (currentVariant === "hyper" && gridDim === 9) {
-    const hyperRegions = [[1, 1], [1, 5], [5, 1], [5, 5]];
-    for (let [hr, hc] of hyperRegions) {
-      if (row >= hr && row < hr + 3 && col >= hc && col < hc + 3) {
-        for (let r = hr; r < hr + 3; r++) {
-          for (let c = hc; c < hc + 3; c++) {
-            if (grid[r][c] === val) return false;
-          }
-        }
-      }
-    }
-  }
-
   return true;
 }
 
-// Inner Subgrid Borders Calculation
+/* --- Rendering --- */
+
 function renderBoard() {
   const container = document.getElementById("board-container");
+  if (!container) return;
+
   container.className = `board-container grid-${gridDim}x${gridDim}`;
-  container.innerHTML = `<div class="overlay-screen" id="game-overlay"></div>`;
+  container.innerHTML = "";
 
   for (let r = 0; r < gridDim; r++) {
     for (let c = 0; c < gridDim; c++) {
@@ -216,42 +240,42 @@ function renderBoard() {
       cell.dataset.row = r;
       cell.dataset.col = c;
 
-      // Draw Inner Box Borders
-      if ((c + 1) % boxCols === 0 && c !== gridDim - 1) {
-        cell.classList.add("box-border-right");
-      }
-      if ((r + 1) % boxRows === 0 && r !== gridDim - 1) {
-        cell.classList.add("box-border-bottom");
-      }
+      if ((c + 1) % boxCols === 0 && c !== gridDim - 1) cell.classList.add("box-border-right");
+      if ((r + 1) % boxRows === 0 && r !== gridDim - 1) cell.classList.add("box-border-bottom");
 
-      if (currentVariant === "diagonal" && (r === c || r + c === gridDim - 1)) {
-        cell.classList.add("diagonal-cell");
-      }
-      if (currentVariant === "hyper" && gridDim === 9) {
-        if ((r >= 1 && r <= 3 && c >= 1 && c <= 3) || (r >= 1 && r <= 3 && c >= 5 && c <= 7) ||
-            (r >= 5 && r <= 7 && c >= 1 && c <= 3) || (r >= 5 && r <= 7 && c >= 5 && c <= 7)) {
-          cell.classList.add("hyper-region");
-        }
-      }
-      if (currentVariant === "even-odd") {
-        cell.classList.add(evenOddMask[r][c] === "E" ? "even-cell" : "odd-cell");
-      }
+      const val = userGrid[r][c];
 
       if (initialGrid[r][c] !== 0) {
         cell.classList.add("given");
         cell.innerText = initialGrid[r][c];
-      } else if (userGrid[r][c] !== 0) {
-        cell.innerText = userGrid[r][c];
-        if (userGrid[r][c] !== solutionGrid[r][c]) cell.classList.add("invalid");
-      } else if (notesGrid[r][c].length > 0) {
+      } else if (val !== 0) {
+        cell.innerText = val;
+        if (val !== solutionGrid[r][c]) {
+          cell.classList.add("invalid");
+        }
+      } else if (notesGrid[r][c].size > 0) {
         const notesContainer = document.createElement("div");
         notesContainer.className = "cell-notes";
-        symbols.forEach(sym => {
-          const noteItem = document.createElement("span");
-          noteItem.innerText = notesGrid[r][c].includes(sym) ? sym : "";
-          notesContainer.appendChild(noteItem);
+        const sortedNotes = Array.from(notesGrid[r][c]).sort();
+        sortedNotes.forEach(note => {
+          const noteSpan = document.createElement("span");
+          noteSpan.innerText = note;
+          notesContainer.appendChild(noteSpan);
         });
         cell.appendChild(notesContainer);
+      }
+
+      if (selectedCell) {
+        if (selectedCell.r === r && selectedCell.c === c) {
+          cell.classList.add("selected");
+        } else if (selectedCell.r === r || selectedCell.c === c) {
+          cell.classList.add("related");
+        }
+      }
+
+      const activeVal = activeNumber || (selectedCell ? userGrid[selectedCell.r][selectedCell.c] : null);
+      if (activeVal && val === activeVal && val !== 0) {
+        cell.classList.add("same-val");
       }
 
       cell.addEventListener("click", () => handleCellClick(r, c));
@@ -260,9 +284,9 @@ function renderBoard() {
   }
 }
 
-// Number Completion Tracking & Dynamic Keypad
 function renderNumpad() {
   const numpad = document.getElementById("numpad");
+  if (!numpad) return;
   numpad.innerHTML = "";
 
   symbols.forEach(sym => {
@@ -276,6 +300,9 @@ function renderNumpad() {
     }
 
     let remaining = gridDim - placedCount;
+    if (remaining <= 0 && activeNumber === sym) {
+      activeNumber = null;
+    }
 
     const btn = document.createElement("button");
     btn.className = "num-btn";
@@ -287,89 +314,67 @@ function renderNumpad() {
       <span class="num-count">${remaining > 0 ? remaining : "✓"}</span>
     `;
 
-    btn.onclick = () => selectNumpadSymbol(sym, remaining);
+    btn.onclick = () => handleNumpadClick(sym, remaining);
     numpad.appendChild(btn);
   });
 }
 
-function selectNumpadSymbol(sym, remaining) {
-  if (remaining <= 0 || isPaused) return;
-
-  if (selectedCell) {
-    const { r, c } = selectedCell;
-    if (initialGrid[r][c] === 0) {
-      handleInput(sym);
-      return;
-    }
-  }
-
-  // Toggle Number-First active selection mode
-  activeNumber = activeNumber === sym ? null : sym;
-  renderNumpad();
-}
+/* --- Gameplay Logic & Input Handling --- */
 
 function handleCellClick(r, c) {
-  selectCell(r, c);
+  if (isPaused) return;
 
-  // Auto-fit active symbol when cell clicked
+  selectedCell = { r, c };
+
   if (activeNumber !== null && initialGrid[r][c] === 0) {
     handleInput(activeNumber);
+  } else {
+    renderBoard();
   }
 }
 
-function selectCell(r, c) {
-  selectedCell = { r, c };
-  const val = userGrid[r][c];
+function handleNumpadClick(sym, remaining) {
+  if (isPaused || remaining <= 0) return;
 
-  document.querySelectorAll(".cell").forEach(cell => {
-    const row = parseInt(cell.dataset.row);
-    const col = parseInt(cell.dataset.col);
-    cell.classList.remove("selected", "related", "same-val");
+  if (selectedCell && initialGrid[selectedCell.r][selectedCell.c] === 0) {
+    handleInput(sym);
+    return;
+  }
 
-    if (row === r && col === c) {
-      cell.classList.add("selected");
-    } else if (row === r || col === c) {
-      cell.classList.add("related");
-    }
-    if (val !== 0 && userGrid[row][col] === val) {
-      cell.classList.add("same-val");
-    }
-  });
+  activeNumber = activeNumber === sym ? null : sym;
+  renderNumpad();
+  renderBoard();
 }
 
 function handleInput(sym) {
-  if (!selectedCell || isPaused) return;
+  if (!selectedCell) return;
   const { r, c } = selectedCell;
   if (initialGrid[r][c] !== 0) return;
 
-  if (noteMode) {
+  if (isNoteMode) {
+    if (notesGrid[r][c].has(sym)) {
+      notesGrid[r][c].delete(sym);
+    } else {
+      notesGrid[r][c].add(sym);
+    }
     userGrid[r][c] = 0;
-    const idx = notesGrid[r][c].indexOf(sym);
-    if (idx > -1) notesGrid[r][c].splice(idx, 1);
-    else notesGrid[r][c].push(sym);
   } else {
-    notesGrid[r][c] = [];
+    notesGrid[r][c].clear();
     userGrid[r][c] = sym;
 
     if (sym !== solutionGrid[r][c]) {
       mistakes++;
-      document.getElementById("mistake-count").innerText = `${mistakes}/${maxMistakes}`;
-      if (mistakes >= maxMistakes) {
-        endGame(false);
-        return;
+      updateMistakesDisplay();
+      if (mistakes >= MAX_MISTAKES) {
+        showOverlay("Game Over!", "You made 3 mistakes.");
       }
+    } else {
+      checkWinCondition();
     }
   }
 
   renderBoard();
   renderNumpad();
-  selectCell(r, c);
-  checkWin();
-}
-
-function toggleNoteMode() {
-  noteMode = !noteMode;
-  document.getElementById("note-btn").innerText = `Note ✏️ (${noteMode ? "ON" : "OFF"})`;
 }
 
 function eraseCell() {
@@ -378,100 +383,111 @@ function eraseCell() {
   if (initialGrid[r][c] !== 0) return;
 
   userGrid[r][c] = 0;
-  notesGrid[r][c] = [];
+  notesGrid[r][c].clear();
+
   renderBoard();
   renderNumpad();
-  selectCell(r, c);
 }
 
-function useHint() {
-  if (!selectedCell || hintsRemaining <= 0 || isPaused) return;
+function toggleNoteMode() {
+  isNoteMode = !isNoteMode;
+  const noteBtn = document.getElementById("note-btn");
+  if (noteBtn) {
+    noteBtn.innerText = isNoteMode ? "Notes ON" : "Notes OFF";
+    noteBtn.classList.toggle("active-mode", isNoteMode);
+  }
+}
+
+function getHint() {
+  if (!selectedCell || isPaused) return;
   const { r, c } = selectedCell;
   if (initialGrid[r][c] !== 0 || userGrid[r][c] === solutionGrid[r][c]) return;
 
   userGrid[r][c] = solutionGrid[r][c];
-  notesGrid[r][c] = [];
-  hintsRemaining--;
-  document.getElementById("hint-count").innerText = hintsRemaining;
+  notesGrid[r][c].clear();
+
   renderBoard();
   renderNumpad();
-  selectCell(r, c);
-  checkWin();
-}
-
-function resetTimer() {
-  clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    if (!isPaused) {
-      secondsElapsed++;
-      const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
-      const secs = String(secondsElapsed % 60).padStart(2, "0");
-      document.getElementById("timer").innerText = `${mins}:${secs}`;
-    }
-  }, 1000);
+  checkWinCondition();
 }
 
 function togglePause() {
   isPaused = !isPaused;
-  const overlay = document.getElementById("game-overlay");
   const pauseBtn = document.getElementById("pause-btn");
 
   if (isPaused) {
-    overlay.innerText = "Game Paused ⏸️";
-    overlay.classList.add("active");
-    pauseBtn.innerText = "Resume ▶️";
+    if (pauseBtn) pauseBtn.innerText = "Resume";
+    showOverlay("Paused", "Take a breath!");
   } else {
-    overlay.classList.remove("active");
-    pauseBtn.innerText = "Pause ⏸️";
+    if (pauseBtn) pauseBtn.innerText = "Pause";
+    hideOverlay();
   }
 }
 
-function checkWin() {
+function checkWinCondition() {
   for (let r = 0; r < gridDim; r++) {
     for (let c = 0; c < gridDim; c++) {
       if (userGrid[r][c] !== solutionGrid[r][c]) return;
     }
   }
-  endGame(true);
+  clearInterval(timerInterval);
+  showOverlay("Congratulations!", `Solved in ${document.getElementById("timer")?.innerText || ""}`);
 }
 
-function endGame(isWin) {
-  clearInterval(timerInterval);
-  const overlay = document.getElementById("game-overlay");
-  overlay.innerText = isWin ? "You Won! 🎉" : "Game Over ❌";
+/* --- Keyboard Support --- */
+
+function setupKeyboardInput() {
+  document.addEventListener("keydown", (e) => {
+    if (isPaused || !selectedCell) return;
+
+    const key = e.key.toUpperCase();
+
+    if (symbols.includes(key)) {
+      handleInput(key);
+    } else if (e.key === "Backspace" || e.key === "Delete") {
+      eraseCell();
+    } else if (e.key === "n" || e.key === "N") {
+      toggleNoteMode();
+    } else if (e.key.startsWith("Arrow")) {
+      moveSelection(e.key);
+    }
+  });
+}
+
+function moveSelection(direction) {
+  if (!selectedCell) {
+    selectedCell = { r: 0, c: 0 };
+  } else {
+    let { r, c } = selectedCell;
+    if (direction === "ArrowUp") r = Math.max(0, r - 1);
+    if (direction === "ArrowDown") r = Math.min(gridDim - 1, r + 1);
+    if (direction === "ArrowLeft") c = Math.max(0, c - 1);
+    if (direction === "ArrowRight") c = Math.min(gridDim - 1, c + 1);
+    selectedCell = { r, c };
+  }
+  renderBoard();
+}
+
+/* --- Overlay Logic --- */
+
+function showOverlay(title, subtitle) {
+  let overlay = document.querySelector(".overlay-screen");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = "overlay-screen";
+    const boardWrapper = document.querySelector(".board-wrapper");
+    if (boardWrapper) boardWrapper.appendChild(overlay);
+  }
+
+  overlay.innerHTML = `
+    <div>${title}</div>
+    <div style="font-size: 0.9rem; font-weight: 500; opacity: 0.8; margin-bottom: 8px;">${subtitle}</div>
+    <button class="overlay-btn" onclick="startNewGame()">Play Again</button>
+  `;
   overlay.classList.add("active");
 }
 
-document.addEventListener("keydown", e => {
-  if (!selectedCell || isPaused) return;
-
-  let keyUpper = e.key.toUpperCase();
-  if (symbols.map(String).includes(keyUpper)) {
-    handleInput(isNaN(keyUpper) ? keyUpper : parseInt(keyUpper));
-  } else if (e.key === "Backspace" || e.key === "Delete") {
-    eraseCell();
-  } else if (e.key.toLowerCase() === "n") {
-    toggleNoteMode();
-  } else if (e.key.toLowerCase() === "p") {
-    togglePause();
-  }
-});
-
-function toggleTheme() {
-  document.body.classList.toggle("dark-theme");
-  const isDark = document.body.classList.contains("dark-theme");
-  document.getElementById("theme-btn").innerText = isDark ? "☀️ Light" : "🌙 Dark";
-  localStorage.setItem("sudoku_theme", isDark ? "dark" : "light");
+function hideOverlay() {
+  const overlay = document.querySelector(".overlay-screen");
+  if (overlay) overlay.classList.remove("active");
 }
-
-function loadSettings() {
-  if (localStorage.getItem("sudoku_theme") === "dark") {
-    document.body.classList.add("dark-theme");
-    document.getElementById("theme-btn").innerText = "☀️ Light";
-  }
-}
-
-function shuffle(arr) {
-  return arr.sort(() => Math.random() - 0.5);
-    }
-    
