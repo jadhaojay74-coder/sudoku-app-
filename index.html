@@ -1,55 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧩</text></svg>">
-  
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sudoku </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sudoku Master Ultimate - Play Classic, Variants & Multiplayer</title>
+  
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧩</text></svg>">
   <link rel="stylesheet" href="styles.css">
+
+  <meta name="description" content="Play free online Sudoku with 5 grid sizes (4x4 to 16x16), Alphabet & Standard variants, real-time analytics, notes, and dark mode.">
+  <meta name="keywords" content="Sudoku, Sudoku game, Free Sudoku, Online Sudoku, Daily Sudoku, Puzzle, Monster Sudoku, Alphabet Sudoku">
+  <meta name="author" content="Jay Jadhao">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://jadhaojay74-coder.github.io/sudoku-app-/">
+
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://jadhaojay74-coder.github.io/sudoku-app-/">
+  <meta property="og:title" content="Sudoku Master Ultimate - Free Online Sudoku & Variants">
+  <meta property="og:description" content="Solve 5 unique grid modes from 4x4 Mini to 16x16 Monster with auto-notes and real-time tracking!">
+  <meta property="og:image" content="https://jadhaojay74-coder.github.io/sudoku-app-/assets/og-preview.png">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://jadhaojay74-coder.github.io/sudoku-app-/">
+  <meta name="twitter:title" content="Sudoku Master Ultimate">
+  <meta name="twitter:description" content="Solve 5 unique grid modes from 4x4 Mini to 16x16 Monster with auto-notes and real-time tracking!">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sudoku Master">
+
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<meta name="description"
-content="Play Sudoku online for free. Enjoy Easy, Medium, Hard and Expert puzzles with hints, notes, timer and daily challenges.">
-
-<meta name="keywords"
-content="Sudoku, Sudoku game, Free Sudoku, Online Sudoku, Daily Sudoku, Puzzle">
-
-<meta name="author" content="Jay Jadhao">
-
-<meta name="robots" content="index, follow">
-
-<link rel="canonical"
-href="https://jadhaojay74-coder.github.io/sudoku-app-/">
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-<title>Sudoku - Play Classic, Variants & Real-Time 1v1 Multiplayer</title>
-<meta name="title" content="Sudoku Master Ultimate - Play Classic, Variants & Real-Time 1v1 Multiplayer">
-<meta name="description" content="Play free online Sudoku with 4 game variants (Classic, Hyper, Diagonal, Mini 6x6), real-time 1v1 multiplayer races, auto-notes, daily challenges, and dark mode.">
-<meta name="keywords" content="sudoku, online sudoku, sudoku multiplayer, windoku, hyper sudoku, sudoku x, 6x6 sudoku, daily sudoku puzzle, puzzle game">
-<meta name="author" content="jadhaojay74-coder">
-<meta name="robots" content="index, follow">
-
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)">
-
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://jadhaojay74-coder.github.io/sudoku-app-/">
-<meta property="og:title" content="Sudoku Master Ultimate - Free Online Sudoku & 1v1 Multiplayer">
-<meta property="og:description" content="Challenge your friends to real-time 1v1 Sudoku races or solve 4 unique puzzle variants with auto-notes and daily streaks!">
-<meta property="og:image" content="https://jadhaojay74-coder.github.io/sudoku-app-/assets/og-preview.png">
-
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:url" content="https://jadhaojay74-coder.github.io/sudoku-app-/">
-<meta name="twitter:title" content="Sudoku Master Ultimate - Free Online Sudoku & 1v1 Multiplayer">
-<meta name="twitter:description" content="Challenge your friends to real-time 1v1 Sudoku races or solve 4 unique puzzle variants with auto-notes and daily streaks!">
-<meta name="twitter:image" content="https://jadhaojay74-coder.github.io/sudoku-app-/assets/og-preview.png">
-
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Sudoku Master">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
     const manifest = {
@@ -57,8 +42,8 @@ href="https://jadhaojay74-coder.github.io/sudoku-app-/">
       short_name: "Sudoku",
       start_url: "./",
       display: "standalone",
-      background_color: "#1a1a2e",
-      theme_color: "#3498db",
+      background_color: "#0f172a",
+      theme_color: "#3b82f6",
       icons: [{ src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>", sizes: "192x192 512x512", type: "image/svg+xml" }]
     };
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
@@ -67,13 +52,10 @@ href="https://jadhaojay74-coder.github.io/sudoku-app-/">
     link.href = URL.createObjectURL(blob);
     document.head.appendChild(link);
   </script>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  
 </head>
 <body>
 
-  <!-- Header Navigation -->
+  <!-- Navigation Header -->
   <header>
     <div class="brand">
       <span class="logo-icon">🧩</span>
@@ -81,84 +63,96 @@ href="https://jadhaojay74-coder.github.io/sudoku-app-/">
     </div>
 
     <nav class="nav-links">
-      <button class="nav-btn active" onclick="switchTab('game-view', this)">Play</button>
-      <button class="nav-btn" onclick="switchTab('status-view', this)">Status 📉</button>
-      <button class="nav-btn" onclick="switchTab('settings-view', this)">Settings</button>
+      <button class="nav-btn active" data-target="game-view">Play</button>
+      <button class="nav-btn" data-target="status-view">Status 📉</button>
+      <button class="nav-btn" data-target="settings-view">Settings</button>
     </nav>
 
     <div class="header-actions">
-     <!-- <button class="install-btn" id="install-btn" onclick="installPWA()">📲 Install</button>-->
-      <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dark</button>
+      <button class="theme-toggle" id="theme-btn">🌙</button>
     </div>
   </header>
 
   <main class="container">
+
     <!-- Game View -->
     <section id="game-view" class="view active">
       <div class="game-header">
         <div class="select-group">
           <select id="grid-size" onchange="changeGridMode()">
-            <option value="9x9" selected>9×9 Classic (Digits 1-9)</option>
-            <option value="3x3">3×3 Mini (Digits 1-3)</option>
+            <option value="4x4">4×4 Mini</option>
+            <option value="6x6">6×6 Medium</option>
+            <option value="9x9" selected>9×9 Classic</option>
+            <option value="12x12">12×12 Giant</option>
+            <option value="16x16">16×16 Monster</option>
+          </select>
+
+          <select id="variant-type" onchange="changeVariantMode()">
+            <option value="classic" selected>Standard Numbers</option>
+            <option value="alphabet">Alphabet</option>
           </select>
 
           <select id="difficulty" onchange="startNewGame()">
             <option value="simple">Simple</option>
             <option value="medium" selected>Medium</option>
             <option value="hard">Hard</option>
-            <option value="expert">Expert (2 Mistakes Max)</option>
+            <option value="expert">Expert</option>
           </select>
         </div>
 
         <div class="stats-group">
           <div class="stat-badge">⏱️ <span id="timer">00:00</span></div>
-          <div class="stat-badge danger-text">❌ <span id="mistake-count">0/3</span></div>
+          <div class="stat-badge danger-text">❌ <span id="mistakes">0/3</span></div>
           <div class="stat-badge">💡 Hints: <span id="hint-count">3</span></div>
         </div>
       </div>
 
       <!-- Sudoku Board Wrapper -->
       <div class="board-wrapper">
-        <div class="board-container grid-9x9" id="board-container">
-          <div class="overlay-screen" id="game-overlay"></div>
-        </div>
+        <div class="board-container grid-9x9" id="board-container"></div>
       </div>
 
       <!-- Controls Grid -->
       <div class="controls-grid">
-        <button class="btn btn-primary" onclick="startNewGame()">New Game 🔄</button>
-        <button class="btn" onclick="togglePause()" id="pause-btn">Pause ⏸️</button>
-        <button class="btn" onclick="toggleNoteMode()" id="note-btn">Note ✏️ (OFF)</button>
-        <button class="btn" onclick="useHint()" id="hint-btn">Hint 💡</button>
-        <button class="btn" onclick="eraseCell()">Erase 🧽</button>
+        <button class="btn" onclick="startNewGame()">New 🔄</button>
+        <button class="btn" id="pause-btn" onclick="togglePause()">Pause ⏸️</button>
+        <button class="btn" id="note-btn" onclick="toggleNoteMode()">Notes OFF</button>
+        <button class="btn" id="hint-btn" onclick="getHint()">Hint 💡</button>
+        <button class="btn" id="erase-btn" onclick="eraseCell()">Erase 🧽</button>
       </div>
 
-      <!-- Numpad -->
+      <!-- Keypad -->
       <div class="numpad" id="numpad"></div>
 
       <div class="keyboard-info">
-        💡 <b>Keyboard:</b> <kbd>Arrows</kbd> Move | <kbd>1-9</kbd> Enter Number | <kbd>Backspace</kbd> Erase | <kbd>N</kbd> Pencil Note | <kbd>P</kbd> Pause
+        💡 <b>Keyboard:</b> <kbd>Arrows</kbd> Move | <kbd>1-9 / A-P</kbd> Enter Value | <kbd>Backspace</kbd> Erase | <kbd>N</kbd> Notes Toggle
       </div>
     </section>
 
-    <!-- Status View -->
-    <div id="status-tab" class="tab-content">
-  <h2>Performance Analytics 📈</h2>
-  <p>Score rating increases on Win and drops on Loss.</p>
+    <!-- Status / Analytics View -->
+    <section id="status-view" class="view">
+      <div class="tab-content">
+        <h2>Performance Analytics 📈</h2>
+        <p style="margin-top: 4px; color: var(--text-muted); font-size: 0.85rem;">
+          Rating reflects win ratios and average solving speeds per difficulty level.
+        </p>
 
-  <label for="difficulty-select">Difficulty:</label>
-  <select id="difficulty-select">
-    <option value="Simple">Simple</option>
-    <option value="Medium" selected>Medium</option>
-    <option value="Hard">Hard</option>
-    <option value="Expert">Expert</option>
-  </select>
+        <div class="setting-row" style="margin-top: 12px;">
+          <label for="difficulty-select">Filter Mode:</label>
+          <select id="difficulty-select" style="max-width: 140px;">
+            <option value="4x4">4×4 Mini</option>
+            <option value="6x6">6×6 Medium</option>
+            <option value="9x9" selected>9×9 Classic</option>
+            <option value="12x12">12×12 Giant</option>
+            <option value="16x16">16×16 Monster</option>
+          </select>
+        </div>
 
-  <!-- Canvas wrapper with non-zero container -->
-  <div class="chart-container">
-    <canvas id="analyticsChart"></canvas>
-  </div>
-    </div>
+        <div class="chart-container">
+          <canvas id="analyticsChart"></canvas>
+        </div>
+      </div>
+    </section>
 
     <!-- Settings View -->
     <section id="settings-view" class="view">
@@ -166,9 +160,17 @@ href="https://jadhaojay74-coder.github.io/sudoku-app-/">
         <h2>Game Settings ⚙️</h2>
         
         <div class="setting-row">
+          <span>Dark Mode Theme</span>
+          <label class="switch">
+            <input type="checkbox" id="theme-switch" onchange="document.getElementById('theme-btn').click()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
           <span>🔊 Sound Effects</span>
           <label class="switch">
-            <input type="checkbox" id="sound-toggle" onchange="toggleSoundSetting(this.checked)" checked>
+            <input type="checkbox" id="sound-toggle" checked>
             <span class="slider"></span>
           </label>
         </div>
@@ -176,21 +178,27 @@ href="https://jadhaojay74-coder.github.io/sudoku-app-/">
         <div class="setting-row">
           <span>📳 Haptic Vibration</span>
           <label class="switch">
-            <input type="checkbox" id="vibe-toggle" onchange="toggleVibeSetting(this.checked)" checked>
+            <input type="checkbox" id="vibe-toggle" checked>
             <span class="slider"></span>
           </label>
         </div>
 
-        <hr />
-
-        <div class="settings-actions">
-          <button class="btn btn-danger" onclick="clearSavedData()">🗑️ Reset Memory & Stats</button>
+        <div class="setting-row">
+          <span>Highlight Conflicts</span>
+          <label class="switch">
+            <input type="checkbox" id="conflict-toggle" checked>
+            <span class="slider"></span>
+          </label>
         </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-light);" />
+
+        <button class="btn-danger" onclick="startNewGame()">🗑️ Reset Game Memory & Stats</button>
       </div>
     </section>
+
   </main>
 
   <script src="script.js"></script>
-  </body>
-
+</body>
 </html>
