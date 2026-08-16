@@ -31,6 +31,17 @@
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
+:root {
+  /* High-contrast highlight for light mode */
+  --cell-related: #e0f2fe;
+}
+
+body.dark-theme {
+  /* High-contrast highlight for dark mode */
+  --cell-related: #1e3a5f;
+}
+
+
 body.dark-theme {
   --bg-color: #0f172a;
   --surface-bg: #1e293b;
