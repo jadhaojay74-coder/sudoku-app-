@@ -1,8 +1,7 @@
-// Extended Game State
 let gridDim = 9;
 let boxRows = 3;
 let boxCols = 3;
-let currentVariant = "classic"; // classic, diagonal, hyper, non-consecutive, even-odd, alphabet
+let currentVariant = "classic";
 
 let solutionGrid = [];
 let initialGrid = [];
@@ -12,6 +11,7 @@ let evenOddMask = [];
 
 let symbols = [];
 let selectedCell = null;
+let activeNumber = null; // Stores number selected from keypad first
 let noteMode = false;
 let isPaused = false;
 let timerInterval = null;
@@ -19,20 +19,15 @@ let secondsElapsed = 0;
 let mistakes = 0;
 let maxMistakes = 3;
 let hintsRemaining = 3;
-let analyticsChart = null;
 
-// Alphabet Character Reference
 const ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
 
 document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
   setupVariantControls();
   startNewGame();
-  setupAnalyticsChart();
-  setupDifficultyListener();
 });
 
-// Dynamic Selector Setup
 function setupVariantControls() {
   const selectGroup = document.querySelector(".select-group");
   if (!selectGroup) return;
@@ -64,26 +59,6 @@ function setupVariantControls() {
   `;
 }
 
-// Navigation Tab Management
-function switchTab(tabId, btnElement) {
-  document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
-  if (btnElement) btnElement.classList.add("active");
-
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-  document.querySelectorAll(".tab-content").forEach(t => (t.style.display = "none"));
-
-  if (tabId === "game-view") {
-    document.getElementById("game-view").classList.add("active");
-  } else if (tabId === "status-view" || tabId === "status-tab") {
-    const statusTab = document.getElementById("status-tab");
-    if (statusTab) statusTab.style.display = "block";
-    renderAnalytics();
-  } else if (tabId === "settings-view") {
-    document.getElementById("settings-view").classList.add("active");
-  }
-}
-
-// Dimension & Variant Modes
 function changeGridMode() {
   const mode = document.getElementById("grid-size").value;
   if (mode === "4x4") { gridDim = 4; boxRows = 2; boxCols = 2; }
@@ -93,14 +68,12 @@ function changeGridMode() {
   else if (mode === "16x16") { gridDim = 16; boxRows = 4; boxCols = 4; }
 
   updateSymbols();
-  initNumpad();
   startNewGame();
 }
 
 function changeVariantMode() {
   currentVariant = document.getElementById("variant-type").value;
   updateSymbols();
-  initNumpad();
   startNewGame();
 }
 
@@ -110,6 +83,14 @@ function updateSymbols() {
   } else {
     symbols = Array.from({ length: gridDim }, (_, i) => i + 1);
   }
+  updateKeyboardGuide();
+}
+
+function updateKeyboardGuide() {
+  const guide = document.getElementById("keyboard-info");
+  if (!guide) return;
+  const symRange = currentVariant === "alphabet" ? `A-${symbols[symbols.length - 1]}` : `1-${gridDim}`;
+  guide.innerHTML = `💡 <b>Keyboard:</b> Direct click number first or select cell | <kbd>${symRange}</kbd> Input | <kbd>N</kbd> Notes`;
 }
 
 function startNewGame() {
@@ -120,26 +101,25 @@ function startNewGame() {
   secondsElapsed = 0;
   isPaused = false;
   selectedCell = null;
+  activeNumber = null;
 
   document.getElementById("mistake-count").innerText = `${mistakes}/${maxMistakes}`;
   document.getElementById("hint-count").innerText = hintsRemaining;
   document.getElementById("game-overlay").classList.remove("active");
 
   updateSymbols();
-  initNumpad();
   generatePuzzle(diff);
   renderBoard();
+  renderNumpad();
   resetTimer();
 }
 
-// Puzzle Generator Engine
 function generatePuzzle(diff) {
   solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
   evenOddMask = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
 
   fillGrid(solutionGrid);
 
-  // Generate Even/Odd masks
   for (let r = 0; r < gridDim; r++) {
     for (let c = 0; c < gridDim; c++) {
       if (typeof solutionGrid[r][c] === "number") {
@@ -185,14 +165,11 @@ function fillGrid(grid) {
   return true;
 }
 
-// Validation Logic for Variants
 function isValidPlacement(grid, row, col, val) {
-  // Row & Column validation
   for (let i = 0; i < gridDim; i++) {
     if (grid[row][i] === val || grid[i][col] === val) return false;
   }
 
-  // Box region validation
   let startR = Math.floor(row / boxRows) * boxRows;
   let startC = Math.floor(col / boxCols) * boxCols;
   for (let r = 0; r < boxRows; r++) {
@@ -201,7 +178,6 @@ function isValidPlacement(grid, row, col, val) {
     }
   }
 
-  // Diagonal / Sudoku X rules
   if (currentVariant === "diagonal") {
     if (row === col) {
       for (let i = 0; i < gridDim; i++) if (grid[i][i] === val) return false;
@@ -211,7 +187,6 @@ function isValidPlacement(grid, row, col, val) {
     }
   }
 
-  // Hyper / Windoku rules (Additional 3x3 Regions)
   if (currentVariant === "hyper" && gridDim === 9) {
     const hyperRegions = [[1, 1], [1, 5], [5, 1], [5, 5]];
     for (let [hr, hc] of hyperRegions) {
@@ -225,21 +200,10 @@ function isValidPlacement(grid, row, col, val) {
     }
   }
 
-  // Non-Consecutive rule (Orthogonal neighbors cannot be consecutive)
-  if (currentVariant === "non-consecutive" && typeof val === "number") {
-    const neighbors = [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]];
-    for (let [nr, nc] of neighbors) {
-      if (nr >= 0 && nr < gridDim && nc >= 0 && nc < gridDim) {
-        let nVal = grid[nr][nc];
-        if (typeof nVal === "number" && nVal !== 0 && Math.abs(nVal - val) === 1) return false;
-      }
-    }
-  }
-
   return true;
 }
 
-// Rendering System
+// Inner Subgrid Borders Calculation
 function renderBoard() {
   const container = document.getElementById("board-container");
   container.className = `board-container grid-${gridDim}x${gridDim}`;
@@ -252,7 +216,14 @@ function renderBoard() {
       cell.dataset.row = r;
       cell.dataset.col = c;
 
-      // Apply Variant Visual Hints
+      // Draw Inner Box Borders
+      if ((c + 1) % boxCols === 0 && c !== gridDim - 1) {
+        cell.classList.add("box-border-right");
+      }
+      if ((r + 1) % boxRows === 0 && r !== gridDim - 1) {
+        cell.classList.add("box-border-bottom");
+      }
+
       if (currentVariant === "diagonal" && (r === c || r + c === gridDim - 1)) {
         cell.classList.add("diagonal-cell");
       }
@@ -283,22 +254,67 @@ function renderBoard() {
         cell.appendChild(notesContainer);
       }
 
-      cell.addEventListener("click", () => selectCell(r, c));
+      cell.addEventListener("click", () => handleCellClick(r, c));
       container.appendChild(cell);
     }
   }
 }
 
-function initNumpad() {
+// Number Completion Tracking & Dynamic Keypad
+function renderNumpad() {
   const numpad = document.getElementById("numpad");
   numpad.innerHTML = "";
+
   symbols.forEach(sym => {
+    let placedCount = 0;
+    for (let r = 0; r < gridDim; r++) {
+      for (let c = 0; c < gridDim; c++) {
+        if (userGrid[r][c] === sym && userGrid[r][c] === solutionGrid[r][c]) {
+          placedCount++;
+        }
+      }
+    }
+
+    let remaining = gridDim - placedCount;
+
     const btn = document.createElement("button");
     btn.className = "num-btn";
-    btn.innerText = sym;
-    btn.onclick = () => handleInput(sym);
+    if (remaining <= 0) btn.classList.add("completed");
+    if (activeNumber === sym) btn.classList.add("active-number");
+
+    btn.innerHTML = `
+      <span class="num-label">${sym}</span>
+      <span class="num-count">${remaining > 0 ? remaining : "✓"}</span>
+    `;
+
+    btn.onclick = () => selectNumpadSymbol(sym, remaining);
     numpad.appendChild(btn);
   });
+}
+
+function selectNumpadSymbol(sym, remaining) {
+  if (remaining <= 0 || isPaused) return;
+
+  if (selectedCell) {
+    const { r, c } = selectedCell;
+    if (initialGrid[r][c] === 0) {
+      handleInput(sym);
+      return;
+    }
+  }
+
+  // Toggle Number-First active selection mode
+  activeNumber = activeNumber === sym ? null : sym;
+  renderNumpad();
+}
+
+function handleCellClick(r, c) {
+  selectCell(r, c);
+
+  // Auto-fit active symbol when cell clicked
+  if (activeNumber !== null && initialGrid[r][c] === 0) {
+    handleInput(activeNumber);
+  }
 }
 
 function selectCell(r, c) {
@@ -321,7 +337,6 @@ function selectCell(r, c) {
   });
 }
 
-// User Actions
 function handleInput(sym) {
   if (!selectedCell || isPaused) return;
   const { r, c } = selectedCell;
@@ -339,14 +354,15 @@ function handleInput(sym) {
     if (sym !== solutionGrid[r][c]) {
       mistakes++;
       document.getElementById("mistake-count").innerText = `${mistakes}/${maxMistakes}`;
-      triggerVibration();
       if (mistakes >= maxMistakes) {
         endGame(false);
         return;
       }
     }
   }
+
   renderBoard();
+  renderNumpad();
   selectCell(r, c);
   checkWin();
 }
@@ -364,6 +380,7 @@ function eraseCell() {
   userGrid[r][c] = 0;
   notesGrid[r][c] = [];
   renderBoard();
+  renderNumpad();
   selectCell(r, c);
 }
 
@@ -377,11 +394,11 @@ function useHint() {
   hintsRemaining--;
   document.getElementById("hint-count").innerText = hintsRemaining;
   renderBoard();
+  renderNumpad();
   selectCell(r, c);
   checkWin();
 }
 
-// Timer & Game Controls
 function resetTimer() {
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
@@ -423,93 +440,13 @@ function endGame(isWin) {
   const overlay = document.getElementById("game-overlay");
   overlay.innerText = isWin ? "You Won! 🎉" : "Game Over ❌";
   overlay.classList.add("active");
-  saveGameScore(isWin);
 }
 
-// Analytics and Storage (Accurate Match Tracking)
-function saveGameScore(isWin) {
-  const diffSelect = document.getElementById("difficulty").value;
-  const diffKey = diffSelect.charAt(0).toUpperCase() + diffSelect.slice(1);
-  const today = new Date().toISOString().split("T")[0];
-
-  let history = JSON.parse(localStorage.getItem("sudoku_analytics_data")) || [];
-  const prevScore = history.length > 0 ? history[history.length - 1].score : 0;
-  const newScore = Math.max(0, prevScore + (isWin ? 100 : -50));
-
-  history.push({
-    gameNum: history.length + 1,
-    date: today,
-    difficulty: diffKey,
-    score: newScore
-  });
-
-  localStorage.setItem("sudoku_analytics_data", JSON.stringify(history));
-}
-
-function setupAnalyticsChart() {
-  const ctx = document.getElementById("analyticsChart");
-  if (!ctx) return;
-
-  analyticsChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [{
-        label: "Rating",
-        data: [],
-        borderColor: "#3b82f6",
-        backgroundColor: "rgba(59, 130, 246, 0.1)",
-        borderWidth: 2,
-        fill: true,
-        tension: 0.3
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true },
-        x: { title: { display: true, text: "Games Played" } }
-      }
-    }
-  });
-}
-
-function setupDifficultyListener() {
-  const diffSelect = document.getElementById("difficulty-select");
-  if (diffSelect) {
-    diffSelect.addEventListener("change", renderAnalytics);
-  }
-}
-
-function renderAnalytics() {
-  if (!analyticsChart) return;
-
-  const selectedDiff = document.getElementById("difficulty-select").value;
-  const history = JSON.parse(localStorage.getItem("sudoku_analytics_data")) || [];
-  const filtered = history.filter(item => item.difficulty.toLowerCase() === selectedDiff.toLowerCase());
-
-  const labels = filtered.map((item, idx) => `Game ${idx + 1} (${item.date})`);
-  const dataPoints = filtered.map(item => item.score);
-
-  analyticsChart.data.labels = labels.length > 0 ? labels : ["No Games Played"];
-  analyticsChart.data.datasets[0].data = dataPoints.length > 0 ? dataPoints : [0];
-  analyticsChart.update();
-}
-
-function clearSavedData() {
-  if (confirm("Reset all statistics and saved memory?")) {
-    localStorage.removeItem("sudoku_analytics_data");
-    renderAnalytics();
-  }
-}
-
-// Global Keyboard Bindings
 document.addEventListener("keydown", e => {
   if (!selectedCell || isPaused) return;
 
   let keyUpper = e.key.toUpperCase();
-  if (symbols.includes(keyUpper)) {
+  if (symbols.map(String).includes(keyUpper)) {
     handleInput(isNaN(keyUpper) ? keyUpper : parseInt(keyUpper));
   } else if (e.key === "Backspace" || e.key === "Delete") {
     eraseCell();
@@ -517,13 +454,6 @@ document.addEventListener("keydown", e => {
     toggleNoteMode();
   } else if (e.key.toLowerCase() === "p") {
     togglePause();
-  } else if (e.key.startsWith("Arrow")) {
-    let { r, c } = selectedCell;
-    if (e.key === "ArrowUp") r = Math.max(0, r - 1);
-    if (e.key === "ArrowDown") r = Math.min(gridDim - 1, r + 1);
-    if (e.key === "ArrowLeft") c = Math.max(0, c - 1);
-    if (e.key === "ArrowRight") c = Math.min(gridDim - 1, c + 1);
-    selectCell(r, c);
   }
 });
 
@@ -541,14 +471,7 @@ function loadSettings() {
   }
 }
 
-function triggerVibration() {
-  const vibeEnabled = document.getElementById("vibe-toggle")?.checked;
-  if (vibeEnabled && navigator.vibrate) navigator.vibrate(200);
-}
-
 function shuffle(arr) {
   return arr.sort(() => Math.random() - 0.5);
-}
-
-function installPWA() {}
-            
+    }
+    
