@@ -1,10 +1,16 @@
-// State Management
+// Extended Game State
 let gridDim = 9;
+let boxRows = 3;
+let boxCols = 3;
+let currentVariant = "classic"; // classic, diagonal, hyper, non-consecutive, even-odd, alphabet
+
 let solutionGrid = [];
 let initialGrid = [];
 let userGrid = [];
 let notesGrid = [];
+let evenOddMask = [];
 
+let symbols = [];
 let selectedCell = null;
 let noteMode = false;
 let isPaused = false;
@@ -15,40 +21,95 @@ let maxMistakes = 3;
 let hintsRemaining = 3;
 let analyticsChart = null;
 
-// Initialization
+// Alphabet Character Reference
+const ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
+
 document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
-  initNumpad();
+  setupVariantControls();
   startNewGame();
   setupAnalyticsChart();
   setupDifficultyListener();
 });
 
-// Tab Switching (Works with both status-view and status-tab)
+// Dynamic Selector Setup
+function setupVariantControls() {
+  const selectGroup = document.querySelector(".select-group");
+  if (!selectGroup) return;
+
+  selectGroup.innerHTML = `
+    <select id="grid-size" onchange="changeGridMode()">
+      <option value="4x4">4×4 Mini</option>
+      <option value="6x6">6×6 Medium</option>
+      <option value="9x9" selected>9×9 Classic</option>
+      <option value="12x12">12×12 Giant</option>
+      <option value="16x16">16×16 Monster</option>
+    </select>
+
+    <select id="variant-type" onchange="changeVariantMode()">
+      <option value="classic" selected>Standard</option>
+      <option value="diagonal">Diagonal (Sudoku X)</option>
+      <option value="hyper">Hyper (Windoku)</option>
+      <option value="non-consecutive">Non-Consecutive</option>
+      <option value="even-odd">Even / Odd</option>
+      <option value="alphabet">Alphabet</option>
+    </select>
+
+    <select id="difficulty" onchange="startNewGame()">
+      <option value="simple">Simple</option>
+      <option value="medium" selected>Medium</option>
+      <option value="hard">Hard</option>
+      <option value="expert">Expert</option>
+    </select>
+  `;
+}
+
+// Navigation Tab Management
 function switchTab(tabId, btnElement) {
-  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-  if (btnElement) btnElement.classList.add('active');
+  document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
+  if (btnElement) btnElement.classList.add("active");
 
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(t => (t.style.display = "none"));
 
-  if (tabId === 'game-view') {
-    document.getElementById('game-view').classList.add('active');
-  } else if (tabId === 'status-view' || tabId === 'status-tab') {
-    const statusTab = document.getElementById('status-tab');
-    if (statusTab) statusTab.style.display = 'block';
+  if (tabId === "game-view") {
+    document.getElementById("game-view").classList.add("active");
+  } else if (tabId === "status-view" || tabId === "status-tab") {
+    const statusTab = document.getElementById("status-tab");
+    if (statusTab) statusTab.style.display = "block";
     renderAnalytics();
-  } else if (tabId === 'settings-view') {
-    document.getElementById('settings-view').classList.add('active');
+  } else if (tabId === "settings-view") {
+    document.getElementById("settings-view").classList.add("active");
   }
 }
 
-// Mode & Difficulty Handlers
+// Dimension & Variant Modes
 function changeGridMode() {
   const mode = document.getElementById("grid-size").value;
-  gridDim = mode === "3x3" ? 3 : 9;
+  if (mode === "4x4") { gridDim = 4; boxRows = 2; boxCols = 2; }
+  else if (mode === "6x6") { gridDim = 6; boxRows = 2; boxCols = 3; }
+  else if (mode === "9x9") { gridDim = 9; boxRows = 3; boxCols = 3; }
+  else if (mode === "12x12") { gridDim = 12; boxRows = 3; boxCols = 4; }
+  else if (mode === "16x16") { gridDim = 16; boxRows = 4; boxCols = 4; }
+
+  updateSymbols();
   initNumpad();
   startNewGame();
+}
+
+function changeVariantMode() {
+  currentVariant = document.getElementById("variant-type").value;
+  updateSymbols();
+  initNumpad();
+  startNewGame();
+}
+
+function updateSymbols() {
+  if (currentVariant === "alphabet") {
+    symbols = ALPHABET.slice(0, gridDim);
+  } else {
+    symbols = Array.from({ length: gridDim }, (_, i) => i + 1);
+  }
 }
 
 function startNewGame() {
@@ -64,21 +125,36 @@ function startNewGame() {
   document.getElementById("hint-count").innerText = hintsRemaining;
   document.getElementById("game-overlay").classList.remove("active");
 
+  updateSymbols();
+  initNumpad();
   generatePuzzle(diff);
   renderBoard();
   resetTimer();
 }
 
-// Sudoku Board Generation & Solvers
+// Puzzle Generator Engine
 function generatePuzzle(diff) {
   solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
+  evenOddMask = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
+
   fillGrid(solutionGrid);
+
+  // Generate Even/Odd masks
+  for (let r = 0; r < gridDim; r++) {
+    for (let c = 0; c < gridDim; c++) {
+      if (typeof solutionGrid[r][c] === "number") {
+        evenOddMask[r][c] = solutionGrid[r][c] % 2 === 0 ? "E" : "O";
+      }
+    }
+  }
 
   initialGrid = solutionGrid.map(row => [...row]);
   userGrid = solutionGrid.map(row => [...row]);
   notesGrid = Array.from({ length: gridDim }, () => Array.from({ length: gridDim }, () => []));
 
-  let holes = gridDim === 3 ? 3 : diff === "simple" ? 30 : diff === "medium" ? 42 : diff === "hard" ? 50 : 56;
+  let removalRatio = diff === "simple" ? 0.35 : diff === "medium" ? 0.5 : diff === "hard" ? 0.62 : 0.7;
+  let holes = Math.floor(gridDim * gridDim * removalRatio);
+
   while (holes > 0) {
     let r = Math.floor(Math.random() * gridDim);
     let c = Math.floor(Math.random() * gridDim);
@@ -94,10 +170,10 @@ function fillGrid(grid) {
   for (let r = 0; r < gridDim; r++) {
     for (let c = 0; c < gridDim; c++) {
       if (grid[r][c] === 0) {
-        let nums = shuffle(Array.from({ length: gridDim }, (_, i) => i + 1));
-        for (let num of nums) {
-          if (isValidPlacement(grid, r, c, num)) {
-            grid[r][c] = num;
+        let shuffleSyms = shuffle([...symbols]);
+        for (let sym of shuffleSyms) {
+          if (isValidPlacement(grid, r, c, sym)) {
+            grid[r][c] = sym;
             if (fillGrid(grid)) return true;
             grid[r][c] = 0;
           }
@@ -109,27 +185,61 @@ function fillGrid(grid) {
   return true;
 }
 
-function isValidPlacement(grid, row, col, num) {
+// Validation Logic for Variants
+function isValidPlacement(grid, row, col, val) {
+  // Row & Column validation
   for (let i = 0; i < gridDim; i++) {
-    if (grid[row][i] === num || grid[i][col] === num) return false;
+    if (grid[row][i] === val || grid[i][col] === val) return false;
   }
-  if (gridDim === 9) {
-    let startR = Math.floor(row / 3) * 3;
-    let startC = Math.floor(col / 3) * 3;
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        if (grid[startR + r][startC + c] === num) return false;
+
+  // Box region validation
+  let startR = Math.floor(row / boxRows) * boxRows;
+  let startC = Math.floor(col / boxCols) * boxCols;
+  for (let r = 0; r < boxRows; r++) {
+    for (let c = 0; c < boxCols; c++) {
+      if (grid[startR + r][startC + c] === val) return false;
+    }
+  }
+
+  // Diagonal / Sudoku X rules
+  if (currentVariant === "diagonal") {
+    if (row === col) {
+      for (let i = 0; i < gridDim; i++) if (grid[i][i] === val) return false;
+    }
+    if (row + col === gridDim - 1) {
+      for (let i = 0; i < gridDim; i++) if (grid[i][gridDim - 1 - i] === val) return false;
+    }
+  }
+
+  // Hyper / Windoku rules (Additional 3x3 Regions)
+  if (currentVariant === "hyper" && gridDim === 9) {
+    const hyperRegions = [[1, 1], [1, 5], [5, 1], [5, 5]];
+    for (let [hr, hc] of hyperRegions) {
+      if (row >= hr && row < hr + 3 && col >= hc && col < hc + 3) {
+        for (let r = hr; r < hr + 3; r++) {
+          for (let c = hc; c < hc + 3; c++) {
+            if (grid[r][c] === val) return false;
+          }
+        }
       }
     }
   }
+
+  // Non-Consecutive rule (Orthogonal neighbors cannot be consecutive)
+  if (currentVariant === "non-consecutive" && typeof val === "number") {
+    const neighbors = [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]];
+    for (let [nr, nc] of neighbors) {
+      if (nr >= 0 && nr < gridDim && nc >= 0 && nc < gridDim) {
+        let nVal = grid[nr][nc];
+        if (typeof nVal === "number" && nVal !== 0 && Math.abs(nVal - val) === 1) return false;
+      }
+    }
+  }
+
   return true;
 }
 
-function shuffle(arr) {
-  return arr.sort(() => Math.random() - 0.5);
-}
-
-// Rendering Logic
+// Rendering System
 function renderBoard() {
   const container = document.getElementById("board-container");
   container.className = `board-container grid-${gridDim}x${gridDim}`;
@@ -142,6 +252,20 @@ function renderBoard() {
       cell.dataset.row = r;
       cell.dataset.col = c;
 
+      // Apply Variant Visual Hints
+      if (currentVariant === "diagonal" && (r === c || r + c === gridDim - 1)) {
+        cell.classList.add("diagonal-cell");
+      }
+      if (currentVariant === "hyper" && gridDim === 9) {
+        if ((r >= 1 && r <= 3 && c >= 1 && c <= 3) || (r >= 1 && r <= 3 && c >= 5 && c <= 7) ||
+            (r >= 5 && r <= 7 && c >= 1 && c <= 3) || (r >= 5 && r <= 7 && c >= 5 && c <= 7)) {
+          cell.classList.add("hyper-region");
+        }
+      }
+      if (currentVariant === "even-odd") {
+        cell.classList.add(evenOddMask[r][c] === "E" ? "even-cell" : "odd-cell");
+      }
+
       if (initialGrid[r][c] !== 0) {
         cell.classList.add("given");
         cell.innerText = initialGrid[r][c];
@@ -151,11 +275,11 @@ function renderBoard() {
       } else if (notesGrid[r][c].length > 0) {
         const notesContainer = document.createElement("div");
         notesContainer.className = "cell-notes";
-        for (let i = 1; i <= gridDim; i++) {
+        symbols.forEach(sym => {
           const noteItem = document.createElement("span");
-          noteItem.innerText = notesGrid[r][c].includes(i) ? i : "";
+          noteItem.innerText = notesGrid[r][c].includes(sym) ? sym : "";
           notesContainer.appendChild(noteItem);
-        }
+        });
         cell.appendChild(notesContainer);
       }
 
@@ -168,13 +292,13 @@ function renderBoard() {
 function initNumpad() {
   const numpad = document.getElementById("numpad");
   numpad.innerHTML = "";
-  for (let i = 1; i <= gridDim; i++) {
+  symbols.forEach(sym => {
     const btn = document.createElement("button");
     btn.className = "num-btn";
-    btn.innerText = i;
-    btn.onclick = () => handleInput(i);
+    btn.innerText = sym;
+    btn.onclick = () => handleInput(sym);
     numpad.appendChild(btn);
-  }
+  });
 }
 
 function selectCell(r, c) {
@@ -188,7 +312,7 @@ function selectCell(r, c) {
 
     if (row === r && col === c) {
       cell.classList.add("selected");
-    } else if (row === r || col === c || (gridDim === 9 && Math.floor(row/3) === Math.floor(r/3) && Math.floor(col/3) === Math.floor(c/3))) {
+    } else if (row === r || col === c) {
       cell.classList.add("related");
     }
     if (val !== 0 && userGrid[row][col] === val) {
@@ -198,21 +322,21 @@ function selectCell(r, c) {
 }
 
 // User Actions
-function handleInput(num) {
+function handleInput(sym) {
   if (!selectedCell || isPaused) return;
   const { r, c } = selectedCell;
   if (initialGrid[r][c] !== 0) return;
 
   if (noteMode) {
     userGrid[r][c] = 0;
-    const idx = notesGrid[r][c].indexOf(num);
+    const idx = notesGrid[r][c].indexOf(sym);
     if (idx > -1) notesGrid[r][c].splice(idx, 1);
-    else notesGrid[r][c].push(num);
+    else notesGrid[r][c].push(sym);
   } else {
     notesGrid[r][c] = [];
-    userGrid[r][c] = num;
+    userGrid[r][c] = sym;
 
-    if (num !== solutionGrid[r][c]) {
+    if (sym !== solutionGrid[r][c]) {
       mistakes++;
       document.getElementById("mistake-count").innerText = `${mistakes}/${maxMistakes}`;
       triggerVibration();
@@ -229,8 +353,7 @@ function handleInput(num) {
 
 function toggleNoteMode() {
   noteMode = !noteMode;
-  const noteBtn = document.getElementById("note-btn");
-  noteBtn.innerText = `Note ✏️ (${noteMode ? "ON" : "OFF"})`;
+  document.getElementById("note-btn").innerText = `Note ✏️ (${noteMode ? "ON" : "OFF"})`;
 }
 
 function eraseCell() {
@@ -258,7 +381,7 @@ function useHint() {
   checkWin();
 }
 
-// Timer & Game Flow Controls
+// Timer & Game Controls
 function resetTimer() {
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
@@ -300,19 +423,16 @@ function endGame(isWin) {
   const overlay = document.getElementById("game-overlay");
   overlay.innerText = isWin ? "You Won! 🎉" : "Game Over ❌";
   overlay.classList.add("active");
-
   saveGameScore(isWin);
 }
 
-// Analytics, Memory & Graph Logic (Starts from 0, Tracks Actual Games Played)
+// Analytics and Storage (Accurate Match Tracking)
 function saveGameScore(isWin) {
   const diffSelect = document.getElementById("difficulty").value;
   const diffKey = diffSelect.charAt(0).toUpperCase() + diffSelect.slice(1);
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   let history = JSON.parse(localStorage.getItem("sudoku_analytics_data")) || [];
-  
-  // Calculate score: Score starts from 0 based on wins (+100) and losses (-50)
   const prevScore = history.length > 0 ? history[history.length - 1].score : 0;
   const newScore = Math.max(0, prevScore + (isWin ? 100 : -50));
 
@@ -349,7 +469,7 @@ function setupAnalyticsChart() {
       maintainAspectRatio: false,
       scales: {
         y: { beginAtZero: true },
-        x: { title: { display: true, text: 'Games Played' } }
+        x: { title: { display: true, text: "Games Played" } }
       }
     }
   });
@@ -367,10 +487,8 @@ function renderAnalytics() {
 
   const selectedDiff = document.getElementById("difficulty-select").value;
   const history = JSON.parse(localStorage.getItem("sudoku_analytics_data")) || [];
-  
   const filtered = history.filter(item => item.difficulty.toLowerCase() === selectedDiff.toLowerCase());
 
-  // Chart starts accurately with played games (1, 2, 3...) starting from baseline 0
   const labels = filtered.map((item, idx) => `Game ${idx + 1} (${item.date})`);
   const dataPoints = filtered.map(item => item.score);
 
@@ -386,14 +504,20 @@ function clearSavedData() {
   }
 }
 
-// Utility Features (Keyboard, Theme, Vibrations)
-document.addEventListener("keydown", (e) => {
+// Global Keyboard Bindings
+document.addEventListener("keydown", e => {
   if (!selectedCell || isPaused) return;
-  if (e.key >= "1" && e.key <= String(gridDim)) handleInput(parseInt(e.key));
-  else if (e.key === "Backspace" || e.key === "Delete") eraseCell();
-  else if (e.key.toLowerCase() === "n") toggleNoteMode();
-  else if (e.key.toLowerCase() === "p") togglePause();
-  else if (e.key.startsWith("Arrow")) {
+
+  let keyUpper = e.key.toUpperCase();
+  if (symbols.includes(keyUpper)) {
+    handleInput(isNaN(keyUpper) ? keyUpper : parseInt(keyUpper));
+  } else if (e.key === "Backspace" || e.key === "Delete") {
+    eraseCell();
+  } else if (e.key.toLowerCase() === "n") {
+    toggleNoteMode();
+  } else if (e.key.toLowerCase() === "p") {
+    togglePause();
+  } else if (e.key.startsWith("Arrow")) {
     let { r, c } = selectedCell;
     if (e.key === "ArrowUp") r = Math.max(0, r - 1);
     if (e.key === "ArrowDown") r = Math.min(gridDim - 1, r + 1);
@@ -422,5 +546,9 @@ function triggerVibration() {
   if (vibeEnabled && navigator.vibrate) navigator.vibrate(200);
 }
 
+function shuffle(arr) {
+  return arr.sort(() => Math.random() - 0.5);
+}
+
 function installPWA() {}
-  
+            
