@@ -4,7 +4,7 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
   --border-light: #cbd5e1;
-  --grid-line: #334155;
+  --grid-line: #0f172a;
 
   --btn-new: #10b981;
   --btn-new-glow: rgba(16, 185, 129, 0.4);
@@ -19,8 +19,8 @@
 
   --cell-bg: #ffffff;
   --cell-given: #f1f5f9;
-  --cell-selected: #dbeafe;
-  --cell-related: #f1f5f9;
+  --cell-selected: #93c5fd;
+  --cell-related: #f8fafc;
   --cell-same: #bfdbfe;
   --cell-error: #fee2e2;
   --cell-diagonal: #fef3c7;
@@ -32,6 +32,7 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
 body.dark-theme {
@@ -40,7 +41,7 @@ body.dark-theme {
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --border-light: #334155;
-  --grid-line: #94a3b8;
+  --grid-line: #f8fafc;
   --cell-bg: #1e293b;
   --cell-given: #0f172a;
   --cell-selected: #1e3a8a;
@@ -68,6 +69,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Header Navigation */
@@ -178,6 +180,7 @@ select {
   font-size: 0.82rem;
   font-weight: 600;
   outline: none;
+  cursor: pointer;
 }
 
 .stats-group {
@@ -206,11 +209,11 @@ select {
   display: grid;
   width: 100%;
   height: 100%;
-  background: var(--border-light);
-  border: 2px solid var(--grid-line);
+  background: var(--cell-bg);
+  border: 3px solid var(--grid-line);
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-lg);
 }
 
 .grid-4x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
@@ -224,13 +227,23 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(0.6rem, 3.5vw, 1.3rem);
+  font-size: clamp(0.55rem, 3vw, 1.25rem);
   font-weight: 600;
-  border: 0.5px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
   cursor: pointer;
   user-select: none;
   position: relative;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+/* Dynamic Subgrid Thick Borders */
+.cell.box-border-right {
+  border-right: 2.5px solid var(--grid-line) !important;
+}
+
+.cell.box-border-bottom {
+  border-bottom: 2.5px solid var(--grid-line) !important;
 }
 
 /* Variant Specific Styles */
@@ -240,10 +253,14 @@ select {
 .cell.odd-cell { background-color: var(--cell-odd); }
 
 .cell.given { background-color: var(--cell-given); font-weight: 700; }
-.cell.selected { background-color: var(--cell-selected) !important; box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.4); }
+.cell.selected { background-color: var(--cell-selected) !important; box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.5); }
 .cell.related { background-color: var(--cell-related); }
 .cell.same-val { background-color: var(--cell-same); }
-.cell.invalid { background-color: var(--cell-error); color: var(--text-error); }
+.cell.invalid { 
+  background-color: var(--cell-error); 
+  color: var(--text-error); 
+  animation: shake 0.3s ease-in-out;
+}
 
 .cell-notes {
   display: grid;
@@ -288,41 +305,89 @@ select {
 .controls-grid .btn:nth-child(4) { background: var(--btn-hint); box-shadow: 0 3px 8px var(--btn-hint-glow); }
 .controls-grid .btn:nth-child(5) { background: var(--btn-erase); box-shadow: 0 3px 8px var(--btn-erase-glow); }
 
+.controls-grid .btn.active-mode {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+  filter: brightness(1.15);
+}
+
 .controls-grid .btn:hover {
   transform: translateY(-2px);
   filter: brightness(1.1);
 }
 
-/* Numpad Responsive Layout */
+/* Numpad Responsive Layout with Badges & Active Selection */
 .numpad {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
   justify-content: center;
+  margin-top: 6px;
 }
 
 .num-btn {
-  flex: 1 0 10%;
-  min-width: 28px;
-  height: 40px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  border: 1px solid var(--border-light);
+  flex: 1 0 11%;
+  min-width: 32px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-light);
   border-radius: var(--radius-sm);
   background: var(--surface-bg);
   color: var(--text-main);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s ease-in-out;
 }
 
-.num-btn:hover, .num-btn:active {
+.num-btn .num-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.num-btn .num-count {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.num-btn:hover:not(.completed) {
   background: #3b82f6;
   color: #ffffff;
   border-color: #3b82f6;
   box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
   transform: translateY(-2px);
+}
+
+.num-btn:hover:not(.completed) .num-count {
+  color: #e0e7ff;
+}
+
+/* Active Selection glow for Number-First placement */
+.num-btn.active-number {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 0 14px rgba(37, 99, 235, 0.6);
+  transform: scale(1.05);
+}
+
+.num-btn.active-number .num-count {
+  color: #e0e7ff !important;
+}
+
+/* Completed & Blocked Keypad Button */
+.num-btn.completed {
+  opacity: 0.25;
+  pointer-events: none;
+  background: #cbd5e1;
+  border-color: #94a3b8;
+  box-shadow: none;
 }
 
 .keyboard-info {
@@ -350,8 +415,8 @@ kbd {
 .overlay-screen {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(5px);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -361,9 +426,27 @@ kbd {
   font-weight: 700;
   font-size: 1.4rem;
   border-radius: var(--radius-md);
+  gap: 12px;
+  text-align: center;
+  padding: 20px;
 }
 
-.overlay-screen.active { display: flex; }
+.overlay-screen.active { 
+  display: flex; 
+  animation: fadeIn 0.25s ease-out;
+}
+
+.overlay-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
 
 /* Settings Card */
 .card {
@@ -401,4 +484,36 @@ kbd {
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
 input:checked + .slider { background-color: #3b82f6; }
 input:checked + .slider:before { transform: translateX(20px); }
+
+/* Keyframe Animations */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Responsive Fixes for 12x12 and 16x16 Monster Grids */
+@media (max-width: 480px) {
+  .grid-12x12 .cell, .grid-16x16 .cell {
+    font-size: 0.55rem;
+  }
   
+  .num-btn {
+    min-width: 26px;
+    height: 42px;
+  }
+
+  .num-btn .num-label {
+    font-size: 0.8rem;
+  }
+
+  .num-btn .num-count {
+    font-size: 0.55rem;
+  }
+    }
+                         
