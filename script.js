@@ -22,6 +22,15 @@ let timerSeconds = 0;
 let timerInterval = null;
 let analyticsChartInstance = null;
 
+// Persistent Real Scores Storage
+let gameStats = JSON.parse(localStorage.getItem("sudoku_best_times")) || {
+  "4x4": { simple: null, medium: null, hard: null, expert: null },
+  "6x6": { simple: null, medium: null, hard: null, expert: null },
+  "9x9": { simple: null, medium: null, hard: null, expert: null },
+  "12x12": { simple: null, medium: null, hard: null, expert: null },
+  "16x16": { simple: null, medium: null, hard: null, expert: null }
+};
+
 const ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -29,6 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
   setupEventListeners();
   startNewGame();
 });
+
+function saveStats() {
+  localStorage.setItem("sudoku_best_times", JSON.stringify(gameStats));
+}
 
 /* --- Sound & Haptic Feedback System --- */
 
@@ -112,6 +125,12 @@ function setupEventListeners() {
   document.getElementById("theme-btn")?.addEventListener("click", toggleTheme);
   document.getElementById("theme-switch")?.addEventListener("change", (e) => setTheme(e.target.checked));
   document.getElementById("reset-data-btn")?.addEventListener("click", resetData);
+
+  // Status Filter Change
+  const statusFilter = document.querySelector("#status-view select");
+  if (statusFilter) {
+    statusFilter.addEventListener("change", initAnalyticsChart);
+  }
 
   setupKeyboardInput();
 }
@@ -346,7 +365,6 @@ function renderBoard() {
         cell.appendChild(notesContainer);
       }
 
-      // Row, Column & Box Highlighting
       if (selectedCell) {
         const isSameRow = selectedCell.r === r;
         const isSameCol = selectedCell.c === c;
@@ -402,7 +420,7 @@ function renderNumpad() {
   });
 }
 
-/* --- Input & Strict 3 Hints Logic --- */
+/* --- Input & Hint Actions --- */
 
 function handleCellClick(r, c) {
   if (isPaused) return;
@@ -490,13 +508,11 @@ function toggleNoteMode() {
 }
 
 function getHint() {
-  // Strictly enforce 3 hints limit
   if (isPaused || hintsRemaining <= 0) return;
 
   let targetR = selectedCell?.r;
   let targetC = selectedCell?.c;
 
-  // Auto-target an empty/incorrect cell if none selected
   if (targetR === undefined || initialGrid[targetR][targetC] !== 0 || userGrid[targetR][targetC] === solutionGrid[targetR][targetC]) {
     let found = false;
     for (let r = 0; r < gridDim; r++) {
@@ -552,6 +568,19 @@ function checkWinCondition() {
   clearInterval(timerInterval);
   playSound("win");
   triggerVibration([100, 50, 100, 50, 200]);
+
+  // Record Best Time to Storage
+  const modeKey = `${gridDim}x${gridDim}`;
+  if (!gameStats[modeKey]) {
+    gameStats[modeKey] = { simple: null, medium: null, hard: null, expert: null };
+  }
+  
+  const bestTime = gameStats[modeKey][currentDifficulty];
+  if (bestTime === null || timerSeconds < bestTime) {
+    gameStats[modeKey][currentDifficulty] = timerSeconds;
+    saveStats();
+  }
+
   showOverlay("Congratulations!", `Solved in ${document.getElementById("timer")?.innerText || ""}`);
 }
 
@@ -615,11 +644,20 @@ function hideOverlay() {
 function resetData() {
   if (confirm("Reset current game session and statistics?")) {
     playSound("click");
+    localStorage.removeItem("sudoku_best_times");
+    gameStats = {
+      "4x4": { simple: null, medium: null, hard: null, expert: null },
+      "6x6": { simple: null, medium: null, hard: null, expert: null },
+      "9x9": { simple: null, medium: null, hard: null, expert: null },
+      "12x12": { simple: null, medium: null, hard: null, expert: null },
+      "16x16": { simple: null, medium: null, hard: null, expert: null }
+    };
+    initAnalyticsChart();
     startNewGame();
   }
 }
 
-/* --- Analytics Chart Initialization --- */
+/* --- Real Analytics Chart Initialization --- */
 
 function initAnalyticsChart() {
   const ctx = document.getElementById("analyticsChart");
@@ -629,22 +667,11 @@ function initAnalyticsChart() {
     analyticsChartInstance.destroy();
   }
 
-  analyticsChartInstance = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: ["Simple", "Medium", "Hard", "Expert"],
-      datasets: [{
-        label: "Best Time (Seconds)",
-        data: [120, 240, 480, 720],
-        backgroundColor: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"],
-        borderRadius: 6
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
-    }
-  });
-        }
+  const statusFilter = document.querySelector("#status-view select");
+  let filterVal = statusFilter ? statusFilter.value : `${gridDim}x${gridDim}`;
+  
+  // Normalize selection text if needed
+  if (filterVal.includes("4x4")) filterVal = "4x4";
+  else if (filterVal.includes("6x6")) filterVal = "6x6";
+  else if (filterVal.includes("9x9")) filterVal = "9x9";
+  else if (filterVa
