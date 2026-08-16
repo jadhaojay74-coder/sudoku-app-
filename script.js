@@ -22,7 +22,7 @@ let timerSeconds = 0;
 let timerInterval = null;
 let analyticsChartInstance = null;
 
-// Persistent Real Game Stats - Stores arrays of finish times to compute averages
+// Persistent Real Game Stats - Average completion times
 let gameStats = JSON.parse(localStorage.getItem("sudoku_avg_times")) || {
   "4x4": { simple: [], medium: [], hard: [], expert: [] },
   "6x6": { simple: [], medium: [], hard: [], expert: [] },
@@ -154,7 +154,10 @@ function setTheme(isDark) {
 /* --- Game Configuration & Difficulty --- */
 
 function changeGridMode() {
-  const mode = document.getElementById("grid-size").value;
+  const modeSelect = document.getElementById("grid-size");
+  if (!modeSelect) return;
+  const mode = modeSelect.value;
+
   if (mode === "4x4") { gridDim = 4; boxRows = 2; boxCols = 2; }
   else if (mode === "6x6") { gridDim = 6; boxRows = 2; boxCols = 3; }
   else if (mode === "9x9") { gridDim = 9; boxRows = 3; boxCols = 3; }
@@ -166,7 +169,8 @@ function changeGridMode() {
 }
 
 function changeVariantMode() {
-  currentVariant = document.getElementById("variant-type").value;
+  const variantSelect = document.getElementById("variant-type");
+  if (variantSelect) currentVariant = variantSelect.value;
   updateSymbols();
   startNewGame();
 }
@@ -265,11 +269,26 @@ function updateHintsDisplay() {
   }
 }
 
-/* --- Generator & Grid Logic --- */
+/* --- Instant Fast Generator (No recursion lag) --- */
 
 function generatePuzzle() {
   solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
-  fillGrid(solutionGrid);
+
+  let symList = [...symbols].sort(() => Math.random() - 0.5);
+  for (let r = 0; r < gridDim; r++) {
+    for (let c = 0; c < gridDim; c++) {
+      let idx = (r * boxCols + Math.floor(r / boxRows) + c) % gridDim;
+      solutionGrid[r][c] = symList[idx];
+    }
+  }
+
+  for (let b = 0; b < gridDim; b += boxRows) {
+    for (let i = 0; i < boxRows; i++) {
+      let r1 = b + i;
+      let r2 = b + Math.floor(Math.random() * boxRows);
+      [solutionGrid[r1], solutionGrid[r2]] = [solutionGrid[r2], solutionGrid[r1]];
+    }
+  }
 
   initialGrid = solutionGrid.map(row => [...row]);
   userGrid = solutionGrid.map(row => [...row]);
@@ -291,39 +310,6 @@ function generatePuzzle() {
       holes--;
     }
   }
-}
-
-function fillGrid(grid) {
-  for (let r = 0; r < gridDim; r++) {
-    for (let c = 0; c < gridDim; c++) {
-      if (grid[r][c] === 0) {
-        let shuffleSyms = [...symbols].sort(() => Math.random() - 0.5);
-        for (let sym of shuffleSyms) {
-          if (isValidPlacement(grid, r, c, sym)) {
-            grid[r][c] = sym;
-            if (fillGrid(grid)) return true;
-            grid[r][c] = 0;
-          }
-        }
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-function isValidPlacement(grid, row, col, val) {
-  for (let i = 0; i < gridDim; i++) {
-    if (grid[row][i] === val || grid[i][col] === val) return false;
-  }
-  let startR = Math.floor(row / boxRows) * boxRows;
-  let startC = Math.floor(col / boxCols) * boxCols;
-  for (let r = 0; r < boxRows; r++) {
-    for (let c = 0; c < boxCols; c++) {
-      if (grid[startR + r][startC + c] === val) return false;
-    }
-  }
-  return true;
 }
 
 /* --- Rendering & Highlighting --- */
@@ -568,7 +554,6 @@ function checkWinCondition() {
   playSound("win");
   triggerVibration([100, 50, 100, 50, 200]);
 
-  // Record Completion Time for Average Calculation
   const modeKey = `${gridDim}x${gridDim}`;
   if (!gameStats[modeKey]) {
     gameStats[modeKey] = { simple: [], medium: [], hard: [], expert: [] };
@@ -656,7 +641,7 @@ function resetData() {
   }
 }
 
-/* --- Real Analytics Chart Initialization (Average Time) --- */
+/* --- Real Analytics Chart Initialization --- */
 
 function initAnalyticsChart() {
   const ctx = document.getElementById("analyticsChart");
@@ -673,4 +658,14 @@ function initAnalyticsChart() {
   else if (filterVal.includes("6x6")) filterVal = "6x6";
   else if (filterVal.includes("9x9")) filterVal = "9x9";
   else if (filterVal.includes("12x12")) filterVal = "12x12";
-  else if (filterVal.includes("16x16"))
+  else if (filterVal.includes("16x16")) filterVal = "16x16";
+
+  const modeData = gameStats[filterVal] || { simple: [], medium: [], hard: [], expert: [] };
+
+  const getAverage = (timeArray) => {
+    if (!Array.isArray(timeArray) || timeArray.length === 0) return 0;
+    const total = timeArray.reduce((sum, time) => sum + time, 0);
+    return Math.round(total / timeArray.length);
+  };
+
+  const chartData = [
