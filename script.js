@@ -22,7 +22,7 @@ let timerSeconds = 0;
 let timerInterval = null;
 let analyticsChartInstance = null;
 
-// Persistent Real Game Stats - Average completion times
+// Persistent Real Game Stats - Stores finish times to compute averages
 let gameStats = JSON.parse(localStorage.getItem("sudoku_avg_times")) || {
   "4x4": { simple: [], medium: [], hard: [], expert: [] },
   "6x6": { simple: [], medium: [], hard: [], expert: [] },
@@ -43,7 +43,22 @@ function saveStats() {
   localStorage.setItem("sudoku_avg_times", JSON.stringify(gameStats));
 }
 
-/* --- Sound & Haptic Feedback System --- */
+function getBoardContainer() {
+  return document.getElementById("board-container") || 
+         document.getElementById("sudoku-board") || 
+         document.querySelector(".board-container") || 
+         document.querySelector(".sudoku-board") || 
+         document.querySelector(".board");
+}
+
+function getNumpadContainer() {
+  return document.getElementById("numpad") || 
+         document.querySelector(".numpad") || 
+         document.querySelector(".number-pad") || 
+         document.querySelector(".numpad-container");
+}
+
+/* --- Sound & Haptic Feedback --- */
 
 function playSound(type) {
   const soundOn = document.getElementById("sound-toggle")?.checked;
@@ -88,14 +103,16 @@ function triggerVibration(pattern) {
 /* --- Navigation & Analytics --- */
 
 function setupNavigation() {
-  const navBtns = document.querySelectorAll(".nav-btn");
-  const views = document.querySelectorAll(".view");
+  const navBtns = document.querySelectorAll(".nav-btn, nav button, header button");
+  const views = document.querySelectorAll(".view, section");
 
   navBtns.forEach(btn => {
     btn.addEventListener("click", () => {
       playSound("click");
       triggerVibration(10);
       const targetId = btn.getAttribute("data-target");
+      if (!targetId) return;
+
       navBtns.forEach(b => b.classList.remove("active"));
       views.forEach(v => v.classList.remove("active"));
 
@@ -112,9 +129,10 @@ function setupNavigation() {
 }
 
 function setupEventListeners() {
-  document.getElementById("grid-size")?.addEventListener("change", changeGridMode);
-  document.getElementById("variant-type")?.addEventListener("change", changeVariantMode);
-  document.getElementById("difficulty")?.addEventListener("change", changeDifficulty);
+  const selects = document.querySelectorAll("select");
+  if (selects.length >= 1) selects[0].addEventListener("change", changeGridMode);
+  if (selects.length >= 2) selects[1].addEventListener("change", changeVariantMode);
+  if (selects.length >= 3) selects[2].addEventListener("change", changeDifficulty);
 
   document.getElementById("new-game-btn")?.addEventListener("click", startNewGame);
   document.getElementById("pause-btn")?.addEventListener("click", togglePause);
@@ -151,33 +169,32 @@ function setTheme(isDark) {
   if (themeSwitch) themeSwitch.checked = isDark;
 }
 
-/* --- Game Configuration & Difficulty --- */
+/* --- Game Configuration --- */
 
 function changeGridMode() {
-  const modeSelect = document.getElementById("grid-size");
-  if (!modeSelect) return;
-  const mode = modeSelect.value;
+  const selects = document.querySelectorAll("select");
+  const val = selects[0] ? selects[0].value.toLowerCase() : "9x9";
 
-  if (mode === "4x4") { gridDim = 4; boxRows = 2; boxCols = 2; }
-  else if (mode === "6x6") { gridDim = 6; boxRows = 2; boxCols = 3; }
-  else if (mode === "9x9") { gridDim = 9; boxRows = 3; boxCols = 3; }
-  else if (mode === "12x12") { gridDim = 12; boxRows = 3; boxCols = 4; }
-  else if (mode === "16x16") { gridDim = 16; boxRows = 4; boxCols = 4; }
+  if (val.includes("4x4") || val.includes("4")) { gridDim = 4; boxRows = 2; boxCols = 2; }
+  else if (val.includes("6x6") || val.includes("6")) { gridDim = 6; boxRows = 2; boxCols = 3; }
+  else if (val.includes("9x9") || val.includes("9")) { gridDim = 9; boxRows = 3; boxCols = 3; }
+  else if (val.includes("12x12") || val.includes("12")) { gridDim = 12; boxRows = 3; boxCols = 4; }
+  else if (val.includes("16x16") || val.includes("16")) { gridDim = 16; boxRows = 4; boxCols = 4; }
 
   updateSymbols();
   startNewGame();
 }
 
 function changeVariantMode() {
-  const variantSelect = document.getElementById("variant-type");
-  if (variantSelect) currentVariant = variantSelect.value;
+  const selects = document.querySelectorAll("select");
+  if (selects[1]) currentVariant = selects[1].value.toLowerCase().includes("alphabet") ? "alphabet" : "classic";
   updateSymbols();
   startNewGame();
 }
 
 function changeDifficulty() {
-  const diffSelect = document.getElementById("difficulty");
-  if (diffSelect) currentDifficulty = diffSelect.value;
+  const selects = document.querySelectorAll("select");
+  if (selects[2]) currentDifficulty = selects[2].value.toLowerCase();
   startNewGame();
 }
 
@@ -187,19 +204,9 @@ function updateSymbols() {
     : Array.from({ length: gridDim }, (_, i) => String(i + 1));
 }
 
-function updateDifficultyDisplay() {
-  const diffSelect = document.getElementById("difficulty");
-  if (diffSelect) {
-    diffSelect.value = currentDifficulty;
-  }
-}
-
 /* --- Game Control --- */
 
 function startNewGame() {
-  const diffSelect = document.getElementById("difficulty");
-  if (diffSelect) currentDifficulty = diffSelect.value;
-
   selectedCell = null;
   activeNumber = null;
   isNoteMode = false;
@@ -217,7 +224,6 @@ function startNewGame() {
   const pauseBtn = document.getElementById("pause-btn");
   if (pauseBtn) pauseBtn.innerText = "Pause ⏸️";
 
-  updateDifficultyDisplay();
   updateMistakesDisplay();
   updateHintsDisplay();
   resetTimer();
@@ -241,7 +247,7 @@ function resetTimer() {
 }
 
 function updateTimerDisplay() {
-  const timerElem = document.getElementById("timer");
+  const timerElem = document.getElementById("timer") || document.querySelector(".timer");
   if (!timerElem) return;
   const mins = String(Math.floor(timerSeconds / 60)).padStart(2, "0");
   const secs = String(timerSeconds % 60).padStart(2, "0");
@@ -249,36 +255,31 @@ function updateTimerDisplay() {
 }
 
 function updateMistakesDisplay() {
-  const mistakeElem = document.getElementById("mistakes");
+  const mistakeElem = document.getElementById("mistakes") || document.querySelector(".mistakes");
   if (mistakeElem) mistakeElem.innerText = `${mistakes}/${maxMistakes}`;
 }
 
 function updateHintsDisplay() {
-  const hintElem = document.getElementById("hint-count");
+  const hintElem = document.getElementById("hint-count") || document.querySelector(".hint-count");
   const hintBtn = document.getElementById("hint-btn");
   if (hintElem) hintElem.innerText = `${hintsRemaining}`;
 
   if (hintBtn) {
-    if (hintsRemaining <= 0) {
-      hintBtn.style.opacity = "0.4";
-      hintBtn.style.cursor = "not-allowed";
-    } else {
-      hintBtn.style.opacity = "1";
-      hintBtn.style.cursor = "pointer";
-    }
+    hintBtn.style.opacity = hintsRemaining <= 0 ? "0.4" : "1";
+    hintBtn.style.cursor = hintsRemaining <= 0 ? "not-allowed" : "pointer";
   }
 }
 
-/* --- Instant Fast Generator (No recursion lag) --- */
+/* --- Board Generator --- */
 
 function generatePuzzle() {
   solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
-
   let symList = [...symbols].sort(() => Math.random() - 0.5);
+
   for (let r = 0; r < gridDim; r++) {
+    let shift = Math.floor(r / boxRows) + (r % boxRows) * boxCols;
     for (let c = 0; c < gridDim; c++) {
-      let idx = (r * boxCols + Math.floor(r / boxRows) + c) % gridDim;
-      solutionGrid[r][c] = symList[idx];
+      solutionGrid[r][c] = symList[(c + shift) % gridDim];
     }
   }
 
@@ -295,10 +296,10 @@ function generatePuzzle() {
   notesGrid = Array.from({ length: gridDim }, () => Array.from({ length: gridDim }, () => new Set()));
 
   let removeRatio = 0.45;
-  if (currentDifficulty === "simple") removeRatio = 0.35;
-  if (currentDifficulty === "medium") removeRatio = 0.50;
-  if (currentDifficulty === "hard") removeRatio = 0.62;
-  if (currentDifficulty === "expert") removeRatio = 0.72;
+  if (currentDifficulty.includes("simple")) removeRatio = 0.35;
+  if (currentDifficulty.includes("medium")) removeRatio = 0.50;
+  if (currentDifficulty.includes("hard")) removeRatio = 0.62;
+  if (currentDifficulty.includes("expert")) removeRatio = 0.72;
 
   let holes = Math.floor(gridDim * gridDim * removeRatio);
   while (holes > 0) {
@@ -312,19 +313,28 @@ function generatePuzzle() {
   }
 }
 
-/* --- Rendering & Highlighting --- */
+/* --- Rendering --- */
 
 function renderBoard() {
-  const container = document.getElementById("board-container");
+  const container = getBoardContainer();
   if (!container) return;
 
   container.className = `board-container grid-${gridDim}x${gridDim}`;
+  container.style.display = "grid";
+  container.style.gridTemplateColumns = `repeat(${gridDim}, 1fr)`;
+  container.style.gridTemplateRows = `repeat(${gridDim}, 1fr)`;
+  container.style.width = "100%";
+  container.style.aspectRatio = "1 / 1";
   container.innerHTML = "";
 
   for (let r = 0; r < gridDim; r++) {
     for (let c = 0; c < gridDim; c++) {
       const cell = document.createElement("div");
       cell.className = "cell";
+      cell.style.display = "flex";
+      cell.style.alignItems = "center";
+      cell.style.justifyContent = "center";
+      cell.style.userSelect = "none";
 
       if ((c + 1) % boxCols === 0 && c !== gridDim - 1) cell.classList.add("box-border-right");
       if ((r + 1) % boxRows === 0 && r !== gridDim - 1) cell.classList.add("box-border-bottom");
@@ -375,7 +385,7 @@ function renderBoard() {
 }
 
 function renderNumpad() {
-  const numpad = document.getElementById("numpad");
+  const numpad = getNumpadContainer();
   if (!numpad) return;
   numpad.innerHTML = "";
 
@@ -405,7 +415,7 @@ function renderNumpad() {
   });
 }
 
-/* --- Input & Actions --- */
+/* --- Gameplay --- */
 
 function handleCellClick(r, c) {
   if (isPaused) return;
@@ -555,17 +565,24 @@ function checkWinCondition() {
   triggerVibration([100, 50, 100, 50, 200]);
 
   const modeKey = `${gridDim}x${gridDim}`;
+  let diffKey = "medium";
+  if (currentDifficulty.includes("simple")) diffKey = "simple";
+  if (currentDifficulty.includes("medium")) diffKey = "medium";
+  if (currentDifficulty.includes("hard")) diffKey = "hard";
+  if (currentDifficulty.includes("expert")) diffKey = "expert";
+
   if (!gameStats[modeKey]) {
     gameStats[modeKey] = { simple: [], medium: [], hard: [], expert: [] };
   }
-  if (!Array.isArray(gameStats[modeKey][currentDifficulty])) {
-    gameStats[modeKey][currentDifficulty] = [];
+  if (!Array.isArray(gameStats[modeKey][diffKey])) {
+    gameStats[modeKey][diffKey] = [];
   }
   
-  gameStats[modeKey][currentDifficulty].push(timerSeconds);
+  gameStats[modeKey][diffKey].push(timerSeconds);
   saveStats();
 
-  showOverlay("Congratulations!", `Solved in ${document.getElementById("timer")?.innerText || ""}`);
+  const timerText = document.getElementById("timer")?.innerText || "";
+  showOverlay("Congratulations!", `Solved in ${timerText}`);
 }
 
 /* --- Keyboard Input --- */
@@ -603,14 +620,14 @@ function showOverlay(title, subtitle) {
   if (!overlay) {
     overlay = document.createElement("div");
     overlay.className = "overlay-screen";
-    const boardWrapper = document.querySelector(".board-wrapper");
-    if (boardWrapper) boardWrapper.appendChild(overlay);
+    const boardWrapper = getBoardContainer()?.parentElement || document.body;
+    boardWrapper.appendChild(overlay);
   }
 
   overlay.innerHTML = `
-    <div>${title}</div>
-    <div style="font-size: 0.9rem; font-weight: 500; opacity: 0.8;">${subtitle}</div>
-    <button class="overlay-btn" id="overlay-play-btn">Play Again</button>
+    <div style="font-size: 1.5rem; font-weight: bold; margin-bottom: 8px;">${title}</div>
+    <div style="font-size: 0.9rem; font-weight: 500; opacity: 0.8; margin-bottom: 16px;">${subtitle}</div>
+    <button class="overlay-btn" id="overlay-play-btn" style="padding: 8px 16px; font-weight: bold; cursor: pointer;">Play Again</button>
   `;
 
   document.getElementById("overlay-play-btn")?.addEventListener("click", () => {
@@ -641,10 +658,10 @@ function resetData() {
   }
 }
 
-/* --- Real Analytics Chart Initialization --- */
+/* --- Real Analytics Chart Initialization (Average Completion Time) --- */
 
 function initAnalyticsChart() {
-  const ctx = document.getElementById("analyticsChart");
+  const ctx = document.getElementById("analyticsChart") || document.querySelector("canvas");
   if (!ctx || typeof Chart === "undefined") return;
 
   if (analyticsChartInstance) {
@@ -659,6 +676,7 @@ function initAnalyticsChart() {
   else if (filterVal.includes("9x9")) filterVal = "9x9";
   else if (filterVal.includes("12x12")) filterVal = "12x12";
   else if (filterVal.includes("16x16")) filterVal = "16x16";
+  else filterVal = "9x9";
 
   const modeData = gameStats[filterVal] || { simple: [], medium: [], hard: [], expert: [] };
 
@@ -669,3 +687,30 @@ function initAnalyticsChart() {
   };
 
   const chartData = [
+    getAverage(modeData.simple),
+    getAverage(modeData.medium),
+    getAverage(modeData.hard),
+    getAverage(modeData.expert)
+  ];
+
+  analyticsChartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ["Simple", "Medium", "Hard", "Expert"],
+      datasets: [{
+        label: "Best Time (Seconds)",
+        data: chartData,
+        backgroundColor: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"],
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
