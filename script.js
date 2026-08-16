@@ -2,6 +2,7 @@ let gridDim = 9;
 let boxRows = 3;
 let boxCols = 3;
 let currentVariant = "classic";
+let currentDifficulty = "medium";
 
 let solutionGrid = [];
 let initialGrid = [];
@@ -15,22 +16,22 @@ let isNoteMode = false;
 let isPaused = false;
 
 let mistakes = 0;
-const MAX_MISTAKES = 3;
+let maxMistakes = 3;
+let hintsRemaining = 3;
 let timerSeconds = 0;
 let timerInterval = null;
+let analyticsChartInstance = null;
 
 const ALPHABET = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"];
 
 document.addEventListener("DOMContentLoaded", () => {
   setupNavigation();
-  setupVariantControls();
-  setupActionButtons();
-  setupThemeToggle();
-  setupKeyboardInput();
+  setupEventListeners();
   startNewGame();
+  initAnalyticsChart();
 });
 
-/* --- UI Navigation & Setup --- */
+/* --- Setup Handlers --- */
 
 function setupNavigation() {
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -38,61 +39,55 @@ function setupNavigation() {
 
   navBtns.forEach(btn => {
     btn.addEventListener("click", () => {
-      const targetView = btn.dataset.target;
+      const targetId = btn.getAttribute("data-target");
       navBtns.forEach(b => b.classList.remove("active"));
       views.forEach(v => v.classList.remove("active"));
 
       btn.classList.add("active");
-      const activeView = document.getElementById(targetView);
-      if (activeView) activeView.classList.add("active");
+      const targetView = document.getElementById(targetId);
+      if (targetView) targetView.classList.add("active");
     });
   });
 }
 
-function setupVariantControls() {
-  const selectGroup = document.querySelector(".select-group");
-  if (!selectGroup) return;
+function setupEventListeners() {
+  document.getElementById("grid-size")?.addEventListener("change", changeGridMode);
+  document.getElementById("variant-type")?.addEventListener("change", changeVariantMode);
+  document.getElementById("difficulty")?.addEventListener("change", changeDifficulty);
 
-  selectGroup.innerHTML = `
-    <select id="grid-size" onchange="changeGridMode()">
-      <option value="4x4">4×4 Mini</option>
-      <option value="6x6">6×6 Medium</option>
-      <option value="9x9" selected>9×9 Classic</option>
-      <option value="12x12">12×12 Giant</option>
-      <option value="16x16">16×16 Monster</option>
-    </select>
+  document.getElementById("new-game-btn")?.addEventListener("click", startNewGame);
+  document.getElementById("pause-btn")?.addEventListener("click", togglePause);
+  document.getElementById("note-btn")?.addEventListener("click", toggleNoteMode);
+  document.getElementById("hint-btn")?.addEventListener("click", getHint);
+  document.getElementById("erase-btn")?.addEventListener("click", eraseCell);
 
-    <select id="variant-type" onchange="changeVariantMode()">
-      <option value="classic" selected>Standard Numbers</option>
-      <option value="alphabet">Alphabet</option>
-    </select>
-  `;
+  document.getElementById("theme-btn")?.addEventListener("click", toggleTheme);
+  document.getElementById("theme-switch")?.addEventListener("change", (e) => {
+    setTheme(e.target.checked);
+  });
+
+  document.getElementById("reset-data-btn")?.addEventListener("click", resetData);
+
+  setupKeyboardInput();
 }
 
-function setupActionButtons() {
-  const controlsGrid = document.querySelector(".controls-grid");
-  if (!controlsGrid) return;
+/* --- Theme Management --- */
 
-  controlsGrid.innerHTML = `
-    <button class="btn" onclick="startNewGame()">New</button>
-    <button class="btn" id="pause-btn" onclick="togglePause()">Pause</button>
-    <button class="btn" id="note-btn" onclick="toggleNoteMode()">Notes OFF</button>
-    <button class="btn" onclick="getHint()">Hint</button>
-    <button class="btn" onclick="eraseCell()">Erase</button>
-  `;
+function toggleTheme() {
+  const isDark = !document.body.classList.contains("dark-theme");
+  setTheme(isDark);
 }
 
-function setupThemeToggle() {
-  const toggleBtn = document.querySelector(".theme-toggle");
-  if (toggleBtn) {
-    toggleBtn.addEventListener("click", () => {
-      document.body.classList.toggle("dark-theme");
-      toggleBtn.innerText = document.body.classList.contains("dark-theme") ? "☀️" : "🌙";
-    });
-  }
+function setTheme(isDark) {
+  document.body.classList.toggle("dark-theme", isDark);
+  const themeBtn = document.getElementById("theme-btn");
+  const themeSwitch = document.getElementById("theme-switch");
+  
+  if (themeBtn) themeBtn.innerText = isDark ? "☀️" : "🌙";
+  if (themeSwitch) themeSwitch.checked = isDark;
 }
 
-/* --- Mode Switchers --- */
+/* --- Modes & Config --- */
 
 function changeGridMode() {
   const mode = document.getElementById("grid-size").value;
@@ -112,13 +107,18 @@ function changeVariantMode() {
   startNewGame();
 }
 
+function changeDifficulty() {
+  currentDifficulty = document.getElementById("difficulty").value;
+  startNewGame();
+}
+
 function updateSymbols() {
   symbols = currentVariant === "alphabet" 
     ? ALPHABET.slice(0, gridDim) 
     : Array.from({ length: gridDim }, (_, i) => String(i + 1));
 }
 
-/* --- Core Game Initialization --- */
+/* --- Game Control --- */
 
 function startNewGame() {
   selectedCell = null;
@@ -126,6 +126,9 @@ function startNewGame() {
   isNoteMode = false;
   isPaused = false;
   mistakes = 0;
+  hintsRemaining = 3;
+
+  maxMistakes = currentDifficulty === "expert" ? 2 : 3;
 
   const noteBtn = document.getElementById("note-btn");
   if (noteBtn) {
@@ -133,7 +136,11 @@ function startNewGame() {
     noteBtn.classList.remove("active-mode");
   }
 
+  const pauseBtn = document.getElementById("pause-btn");
+  if (pauseBtn) pauseBtn.innerText = "Pause ⏸️";
+
   updateMistakesDisplay();
+  updateHintsDisplay();
   resetTimer();
   updateSymbols();
   generatePuzzle();
@@ -164,12 +171,15 @@ function updateTimerDisplay() {
 
 function updateMistakesDisplay() {
   const mistakeElem = document.getElementById("mistakes");
-  if (mistakeElem) {
-    mistakeElem.innerText = `${mistakes}/${MAX_MISTAKES}`;
-  }
+  if (mistakeElem) mistakeElem.innerText = `${mistakes}/${maxMistakes}`;
 }
 
-/* --- Puzzle Generator & Solver --- */
+function updateHintsDisplay() {
+  const hintElem = document.getElementById("hint-count");
+  if (hintElem) hintElem.innerText = `${hintsRemaining}`;
+}
+
+/* --- Generator & Logic --- */
 
 function generatePuzzle() {
   solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
@@ -179,7 +189,13 @@ function generatePuzzle() {
   userGrid = solutionGrid.map(row => [...row]);
   notesGrid = Array.from({ length: gridDim }, () => Array.from({ length: gridDim }, () => new Set()));
 
-  let holes = Math.floor(gridDim * gridDim * 0.52);
+  let removeRatio = 0.45;
+  if (currentDifficulty === "simple") removeRatio = 0.35;
+  if (currentDifficulty === "medium") removeRatio = 0.50;
+  if (currentDifficulty === "hard") removeRatio = 0.62;
+  if (currentDifficulty === "expert") removeRatio = 0.72;
+
+  let holes = Math.floor(gridDim * gridDim * removeRatio);
   while (holes > 0) {
     let r = Math.floor(Math.random() * gridDim);
     let c = Math.floor(Math.random() * gridDim);
@@ -237,8 +253,6 @@ function renderBoard() {
     for (let c = 0; c < gridDim; c++) {
       const cell = document.createElement("div");
       cell.className = "cell";
-      cell.dataset.row = r;
-      cell.dataset.col = c;
 
       if ((c + 1) % boxCols === 0 && c !== gridDim - 1) cell.classList.add("box-border-right");
       if ((r + 1) % boxRows === 0 && r !== gridDim - 1) cell.classList.add("box-border-bottom");
@@ -319,7 +333,7 @@ function renderNumpad() {
   });
 }
 
-/* --- Gameplay Logic & Input Handling --- */
+/* --- Input Logic --- */
 
 function handleCellClick(r, c) {
   if (isPaused) return;
@@ -365,8 +379,8 @@ function handleInput(sym) {
     if (sym !== solutionGrid[r][c]) {
       mistakes++;
       updateMistakesDisplay();
-      if (mistakes >= MAX_MISTAKES) {
-        showOverlay("Game Over!", "You made 3 mistakes.");
+      if (mistakes >= maxMistakes) {
+        showOverlay("Game Over!", "Maximum mistakes reached.");
       }
     } else {
       checkWinCondition();
@@ -399,13 +413,15 @@ function toggleNoteMode() {
 }
 
 function getHint() {
-  if (!selectedCell || isPaused) return;
+  if (!selectedCell || isPaused || hintsRemaining <= 0) return;
   const { r, c } = selectedCell;
   if (initialGrid[r][c] !== 0 || userGrid[r][c] === solutionGrid[r][c]) return;
 
   userGrid[r][c] = solutionGrid[r][c];
   notesGrid[r][c].clear();
+  hintsRemaining--;
 
+  updateHintsDisplay();
   renderBoard();
   renderNumpad();
   checkWinCondition();
@@ -416,10 +432,10 @@ function togglePause() {
   const pauseBtn = document.getElementById("pause-btn");
 
   if (isPaused) {
-    if (pauseBtn) pauseBtn.innerText = "Resume";
-    showOverlay("Paused", "Take a breath!");
+    if (pauseBtn) pauseBtn.innerText = "Resume ▶️";
+    showOverlay("Paused", "Game is currently paused.");
   } else {
-    if (pauseBtn) pauseBtn.innerText = "Pause";
+    if (pauseBtn) pauseBtn.innerText = "Pause ⏸️";
     hideOverlay();
   }
 }
@@ -434,7 +450,7 @@ function checkWinCondition() {
   showOverlay("Congratulations!", `Solved in ${document.getElementById("timer")?.innerText || ""}`);
 }
 
-/* --- Keyboard Support --- */
+/* --- Keyboard Input --- */
 
 function setupKeyboardInput() {
   document.addEventListener("keydown", (e) => {
@@ -481,9 +497,11 @@ function showOverlay(title, subtitle) {
 
   overlay.innerHTML = `
     <div>${title}</div>
-    <div style="font-size: 0.9rem; font-weight: 500; opacity: 0.8; margin-bottom: 8px;">${subtitle}</div>
-    <button class="overlay-btn" onclick="startNewGame()">Play Again</button>
+    <div style="font-size: 0.9rem; font-weight: 500; opacity: 0.8;">${subtitle}</div>
+    <button class="overlay-btn" id="overlay-play-btn">Play Again</button>
   `;
+
+  document.getElementById("overlay-play-btn")?.addEventListener("click", startNewGame);
   overlay.classList.add("active");
 }
 
@@ -491,3 +509,44 @@ function hideOverlay() {
   const overlay = document.querySelector(".overlay-screen");
   if (overlay) overlay.classList.remove("active");
 }
+
+function resetData() {
+  if (confirm("Reset current game session and statistics?")) {
+    startNewGame();
+  }
+}
+
+/* --- Analytics Chart --- */
+
+function initAnalyticsChart() {
+  const ctx = document.getElementById("analyticsChart");
+  if (!ctx || typeof Chart === "undefined") return;
+
+  if (analyticsChartInstance) {
+    analyticsChartInstance.destroy();
+  }
+
+  analyticsChartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ["Simple", "Medium", "Hard", "Expert"],
+      datasets: [{
+        label: "Best Time (Seconds)",
+        data: [120, 240, 480, 720],
+        backgroundColor: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"],
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+  }
+                                       
