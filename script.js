@@ -28,10 +28,51 @@ document.addEventListener("DOMContentLoaded", () => {
   setupNavigation();
   setupEventListeners();
   startNewGame();
-  initAnalyticsChart();
 });
 
-/* --- Setup Handlers --- */
+/* --- Sound & Haptic Feedback System --- */
+
+function playSound(type) {
+  const soundOn = document.getElementById("sound-toggle")?.checked;
+  if (!soundOn) return;
+
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (type === "click") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    } else if (type === "error") {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(180, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } else if (type === "win") {
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    }
+  } catch (e) {}
+}
+
+function triggerVibration(pattern) {
+  const vibeOn = document.getElementById("vibe-toggle")?.checked;
+  if (vibeOn && navigator.vibrate) {
+    navigator.vibrate(pattern);
+  }
+}
+
+/* --- Navigation & Analytics --- */
 
 function setupNavigation() {
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -39,13 +80,20 @@ function setupNavigation() {
 
   navBtns.forEach(btn => {
     btn.addEventListener("click", () => {
+      playSound("click");
+      triggerVibration(10);
       const targetId = btn.getAttribute("data-target");
       navBtns.forEach(b => b.classList.remove("active"));
       views.forEach(v => v.classList.remove("active"));
 
       btn.classList.add("active");
       const targetView = document.getElementById(targetId);
-      if (targetView) targetView.classList.add("active");
+      if (targetView) {
+        targetView.classList.add("active");
+        if (targetId === "status-view") {
+          setTimeout(initAnalyticsChart, 50);
+        }
+      }
     });
   });
 }
@@ -62,10 +110,7 @@ function setupEventListeners() {
   document.getElementById("erase-btn")?.addEventListener("click", eraseCell);
 
   document.getElementById("theme-btn")?.addEventListener("click", toggleTheme);
-  document.getElementById("theme-switch")?.addEventListener("change", (e) => {
-    setTheme(e.target.checked);
-  });
-
+  document.getElementById("theme-switch")?.addEventListener("change", (e) => setTheme(e.target.checked));
   document.getElementById("reset-data-btn")?.addEventListener("click", resetData);
 
   setupKeyboardInput();
@@ -74,8 +119,9 @@ function setupEventListeners() {
 /* --- Theme Management --- */
 
 function toggleTheme() {
-  const isDark = !document.body.classList.contains("dark-theme");
-  setTheme(isDark);
+  playSound("click");
+  triggerVibration(10);
+  setTheme(!document.body.classList.contains("dark-theme"));
 }
 
 function setTheme(isDark) {
@@ -87,7 +133,7 @@ function setTheme(isDark) {
   if (themeSwitch) themeSwitch.checked = isDark;
 }
 
-/* --- Modes & Config --- */
+/* --- Game Configuration & Difficulty --- */
 
 function changeGridMode() {
   const mode = document.getElementById("grid-size").value;
@@ -108,7 +154,8 @@ function changeVariantMode() {
 }
 
 function changeDifficulty() {
-  currentDifficulty = document.getElementById("difficulty").value;
+  const diffSelect = document.getElementById("difficulty");
+  if (diffSelect) currentDifficulty = diffSelect.value;
   startNewGame();
 }
 
@@ -118,16 +165,25 @@ function updateSymbols() {
     : Array.from({ length: gridDim }, (_, i) => String(i + 1));
 }
 
+function updateDifficultyDisplay() {
+  const diffSelect = document.getElementById("difficulty");
+  if (diffSelect) {
+    diffSelect.value = currentDifficulty;
+  }
+}
+
 /* --- Game Control --- */
 
 function startNewGame() {
+  const diffSelect = document.getElementById("difficulty");
+  if (diffSelect) currentDifficulty = diffSelect.value;
+
   selectedCell = null;
   activeNumber = null;
   isNoteMode = false;
   isPaused = false;
   mistakes = 0;
   hintsRemaining = 3;
-
   maxMistakes = currentDifficulty === "expert" ? 2 : 3;
 
   const noteBtn = document.getElementById("note-btn");
@@ -139,6 +195,7 @@ function startNewGame() {
   const pauseBtn = document.getElementById("pause-btn");
   if (pauseBtn) pauseBtn.innerText = "Pause ⏸️";
 
+  updateDifficultyDisplay();
   updateMistakesDisplay();
   updateHintsDisplay();
   resetTimer();
@@ -176,10 +233,21 @@ function updateMistakesDisplay() {
 
 function updateHintsDisplay() {
   const hintElem = document.getElementById("hint-count");
+  const hintBtn = document.getElementById("hint-btn");
   if (hintElem) hintElem.innerText = `${hintsRemaining}`;
+
+  if (hintBtn) {
+    if (hintsRemaining <= 0) {
+      hintBtn.style.opacity = "0.4";
+      hintBtn.style.cursor = "not-allowed";
+    } else {
+      hintBtn.style.opacity = "1";
+      hintBtn.style.cursor = "pointer";
+    }
+  }
 }
 
-/* --- Generator & Logic --- */
+/* --- Generator & Grid Logic --- */
 
 function generatePuzzle() {
   solutionGrid = Array.from({ length: gridDim }, () => Array(gridDim).fill(0));
@@ -240,7 +308,7 @@ function isValidPlacement(grid, row, col, val) {
   return true;
 }
 
-/* --- Rendering --- */
+/* --- Rendering & Highlighting --- */
 
 function renderBoard() {
   const container = document.getElementById("board-container");
@@ -270,8 +338,7 @@ function renderBoard() {
       } else if (notesGrid[r][c].size > 0) {
         const notesContainer = document.createElement("div");
         notesContainer.className = "cell-notes";
-        const sortedNotes = Array.from(notesGrid[r][c]).sort();
-        sortedNotes.forEach(note => {
+        Array.from(notesGrid[r][c]).sort().forEach(note => {
           const noteSpan = document.createElement("span");
           noteSpan.innerText = note;
           notesContainer.appendChild(noteSpan);
@@ -279,10 +346,16 @@ function renderBoard() {
         cell.appendChild(notesContainer);
       }
 
+      // Row, Column & Box Highlighting
       if (selectedCell) {
-        if (selectedCell.r === r && selectedCell.c === c) {
+        const isSameRow = selectedCell.r === r;
+        const isSameCol = selectedCell.c === c;
+        const isSameBox = Math.floor(selectedCell.r / boxRows) === Math.floor(r / boxRows) &&
+                          Math.floor(selectedCell.c / boxCols) === Math.floor(c / boxCols);
+
+        if (isSameRow && isSameCol) {
           cell.classList.add("selected");
-        } else if (selectedCell.r === r || selectedCell.c === c) {
+        } else if (isSameRow || isSameCol || isSameBox) {
           cell.classList.add("related");
         }
       }
@@ -307,16 +380,12 @@ function renderNumpad() {
     let placedCount = 0;
     for (let r = 0; r < gridDim; r++) {
       for (let c = 0; c < gridDim; c++) {
-        if (userGrid[r][c] === sym && userGrid[r][c] === solutionGrid[r][c]) {
-          placedCount++;
-        }
+        if (userGrid[r][c] === sym && userGrid[r][c] === solutionGrid[r][c]) placedCount++;
       }
     }
 
     let remaining = gridDim - placedCount;
-    if (remaining <= 0 && activeNumber === sym) {
-      activeNumber = null;
-    }
+    if (remaining <= 0 && activeNumber === sym) activeNumber = null;
 
     const btn = document.createElement("button");
     btn.className = "num-btn";
@@ -333,11 +402,12 @@ function renderNumpad() {
   });
 }
 
-/* --- Input Logic --- */
+/* --- Input & Strict 3 Hints Logic --- */
 
 function handleCellClick(r, c) {
   if (isPaused) return;
-
+  playSound("click");
+  triggerVibration(10);
   selectedCell = { r, c };
 
   if (activeNumber !== null && initialGrid[r][c] === 0) {
@@ -349,6 +419,8 @@ function handleCellClick(r, c) {
 
 function handleNumpadClick(sym, remaining) {
   if (isPaused || remaining <= 0) return;
+  playSound("click");
+  triggerVibration(10);
 
   if (selectedCell && initialGrid[selectedCell.r][selectedCell.c] === 0) {
     handleInput(sym);
@@ -366,11 +438,8 @@ function handleInput(sym) {
   if (initialGrid[r][c] !== 0) return;
 
   if (isNoteMode) {
-    if (notesGrid[r][c].has(sym)) {
-      notesGrid[r][c].delete(sym);
-    } else {
-      notesGrid[r][c].add(sym);
-    }
+    if (notesGrid[r][c].has(sym)) notesGrid[r][c].delete(sym);
+    else notesGrid[r][c].add(sym);
     userGrid[r][c] = 0;
   } else {
     notesGrid[r][c].clear();
@@ -378,11 +447,15 @@ function handleInput(sym) {
 
     if (sym !== solutionGrid[r][c]) {
       mistakes++;
+      playSound("error");
+      triggerVibration([50, 50, 50]);
       updateMistakesDisplay();
       if (mistakes >= maxMistakes) {
         showOverlay("Game Over!", "Maximum mistakes reached.");
       }
     } else {
+      playSound("click");
+      triggerVibration(15);
       checkWinCondition();
     }
   }
@@ -396,6 +469,8 @@ function eraseCell() {
   const { r, c } = selectedCell;
   if (initialGrid[r][c] !== 0) return;
 
+  playSound("click");
+  triggerVibration(10);
   userGrid[r][c] = 0;
   notesGrid[r][c].clear();
 
@@ -404,6 +479,8 @@ function eraseCell() {
 }
 
 function toggleNoteMode() {
+  playSound("click");
+  triggerVibration(10);
   isNoteMode = !isNoteMode;
   const noteBtn = document.getElementById("note-btn");
   if (noteBtn) {
@@ -413,12 +490,36 @@ function toggleNoteMode() {
 }
 
 function getHint() {
-  if (!selectedCell || isPaused || hintsRemaining <= 0) return;
-  const { r, c } = selectedCell;
-  if (initialGrid[r][c] !== 0 || userGrid[r][c] === solutionGrid[r][c]) return;
+  // Strictly enforce 3 hints limit
+  if (isPaused || hintsRemaining <= 0) return;
 
-  userGrid[r][c] = solutionGrid[r][c];
-  notesGrid[r][c].clear();
+  let targetR = selectedCell?.r;
+  let targetC = selectedCell?.c;
+
+  // Auto-target an empty/incorrect cell if none selected
+  if (targetR === undefined || initialGrid[targetR][targetC] !== 0 || userGrid[targetR][targetC] === solutionGrid[targetR][targetC]) {
+    let found = false;
+    for (let r = 0; r < gridDim; r++) {
+      for (let c = 0; c < gridDim; c++) {
+        if (initialGrid[r][c] === 0 && userGrid[r][c] !== solutionGrid[r][c]) {
+          targetR = r;
+          targetC = c;
+          found = true;
+          break;
+        }
+      }
+      if (found) break;
+    }
+    if (!found) return;
+  }
+
+  playSound("click");
+  triggerVibration(20);
+
+  selectedCell = { r: targetR, c: targetC };
+  userGrid[targetR][targetC] = solutionGrid[targetR][targetC];
+  notesGrid[targetR][targetC].clear();
+  
   hintsRemaining--;
 
   updateHintsDisplay();
@@ -428,6 +529,8 @@ function getHint() {
 }
 
 function togglePause() {
+  playSound("click");
+  triggerVibration(10);
   isPaused = !isPaused;
   const pauseBtn = document.getElementById("pause-btn");
 
@@ -447,6 +550,8 @@ function checkWinCondition() {
     }
   }
   clearInterval(timerInterval);
+  playSound("win");
+  triggerVibration([100, 50, 100, 50, 200]);
   showOverlay("Congratulations!", `Solved in ${document.getElementById("timer")?.innerText || ""}`);
 }
 
@@ -455,18 +560,12 @@ function checkWinCondition() {
 function setupKeyboardInput() {
   document.addEventListener("keydown", (e) => {
     if (isPaused || !selectedCell) return;
-
     const key = e.key.toUpperCase();
 
-    if (symbols.includes(key)) {
-      handleInput(key);
-    } else if (e.key === "Backspace" || e.key === "Delete") {
-      eraseCell();
-    } else if (e.key === "n" || e.key === "N") {
-      toggleNoteMode();
-    } else if (e.key.startsWith("Arrow")) {
-      moveSelection(e.key);
-    }
+    if (symbols.includes(key)) handleInput(key);
+    else if (e.key === "Backspace" || e.key === "Delete") eraseCell();
+    else if (e.key === "n" || e.key === "N") toggleNoteMode();
+    else if (e.key.startsWith("Arrow")) moveSelection(e.key);
   });
 }
 
@@ -484,7 +583,7 @@ function moveSelection(direction) {
   renderBoard();
 }
 
-/* --- Overlay Logic --- */
+/* --- Overlays & Reset --- */
 
 function showOverlay(title, subtitle) {
   let overlay = document.querySelector(".overlay-screen");
@@ -501,7 +600,10 @@ function showOverlay(title, subtitle) {
     <button class="overlay-btn" id="overlay-play-btn">Play Again</button>
   `;
 
-  document.getElementById("overlay-play-btn")?.addEventListener("click", startNewGame);
+  document.getElementById("overlay-play-btn")?.addEventListener("click", () => {
+    playSound("click");
+    startNewGame();
+  });
   overlay.classList.add("active");
 }
 
@@ -512,11 +614,12 @@ function hideOverlay() {
 
 function resetData() {
   if (confirm("Reset current game session and statistics?")) {
+    playSound("click");
     startNewGame();
   }
 }
 
-/* --- Analytics Chart --- */
+/* --- Analytics Chart Initialization --- */
 
 function initAnalyticsChart() {
   const ctx = document.getElementById("analyticsChart");
@@ -540,13 +643,8 @@ function initAnalyticsChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false }
-      },
-      scales: {
-        y: { beginAtZero: true }
-      }
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
     }
   });
-  }
-                                       
+        }
