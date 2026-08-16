@@ -23,11 +23,15 @@
   --cell-related: #f1f5f9;
   --cell-same: #bfdbfe;
   --cell-error: #fee2e2;
+  --cell-diagonal: #fef3c7;
+  --cell-hyper: #e0e7ff;
+  --cell-even: #f3e8ff;
+  --cell-odd: #ecfdf5;
   --text-error: #ef4444;
 
   --radius-sm: 8px;
   --radius-md: 12px;
-  --shadow-sm: 0 2px 5px rgba(0,0,0,0.05);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 body.dark-theme {
@@ -43,6 +47,10 @@ body.dark-theme {
   --cell-related: #1e293b;
   --cell-same: #334155;
   --cell-error: #450a0a;
+  --cell-diagonal: #451a03;
+  --cell-hyper: #1e1b4b;
+  --cell-even: #3b0764;
+  --cell-odd: #064e3b;
 }
 
 * {
@@ -62,10 +70,10 @@ body {
   align-items: center;
 }
 
-/* App Header & Navigation */
+/* Header Navigation */
 header {
   width: 100%;
-  max-width: 480px;
+  max-width: 500px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -103,7 +111,7 @@ header {
 
 .nav-btn.active {
   background: #3b82f6;
-  color: #fff;
+  color: #ffffff;
   border-color: #3b82f6;
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
 }
@@ -124,10 +132,10 @@ header {
   cursor: pointer;
 }
 
-/* Layout Containers */
+/* Containers */
 .container {
   width: 100%;
-  max-width: 480px;
+  max-width: 500px;
   padding: 12px;
 }
 
@@ -148,7 +156,7 @@ header {
   box-shadow: var(--shadow-sm);
 }
 
-/* Game Controls & Board Header */
+/* Controls Header */
 .game-header {
   display: flex;
   flex-direction: column;
@@ -187,7 +195,7 @@ select {
   color: var(--btn-erase);
 }
 
-/* Sudoku Board Grid */
+/* Board Grid Layouts */
 .board-wrapper {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -202,25 +210,21 @@ select {
   border: 2px solid var(--grid-line);
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.grid-9x9 {
-  grid-template-columns: repeat(9, 1fr);
-  grid-template-rows: repeat(9, 1fr);
-}
-
-.grid-3x3 {
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-}
+.grid-4x4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
+.grid-6x6 { grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); }
+.grid-9x9 { grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr); }
+.grid-12x12 { grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(12, 1fr); }
+.grid-16x16 { grid-template-columns: repeat(16, 1fr); grid-template-rows: repeat(16, 1fr); }
 
 .cell {
   background-color: var(--cell-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(1rem, 4.2vw, 1.35rem);
+  font-size: clamp(0.6rem, 3.5vw, 1.3rem);
   font-weight: 600;
   border: 0.5px solid var(--border-light);
   cursor: pointer;
@@ -229,8 +233,11 @@ select {
   transition: background-color 0.15s ease;
 }
 
-.cell[data-col="2"], .cell[data-col="5"] { border-right: 2px solid var(--grid-line); }
-.cell[data-row="2"], .cell[data-row="5"] { border-bottom: 2px solid var(--grid-line); }
+/* Variant Specific Styles */
+.cell.diagonal-cell { background-color: var(--cell-diagonal); }
+.cell.hyper-region { background-color: var(--cell-hyper); }
+.cell.even-cell { background-color: var(--cell-even); }
+.cell.odd-cell { background-color: var(--cell-odd); }
 
 .cell.given { background-color: var(--cell-given); font-weight: 700; }
 .cell.selected { background-color: var(--cell-selected) !important; box-shadow: inset 0 0 8px rgba(59, 130, 246, 0.4); }
@@ -243,14 +250,14 @@ select {
   grid-template-columns: repeat(3, 1fr);
   width: 100%;
   height: 100%;
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   color: var(--text-muted);
   text-align: center;
   align-items: center;
   pointer-events: none;
 }
 
-/* Equal Positioning & Glowing Action Buttons Grid */
+/* Action Controls Grid */
 .controls-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -263,7 +270,7 @@ select {
   border: none;
   border-radius: var(--radius-sm);
   color: #ffffff;
-  font-size: clamp(0.68rem, 2vw, 0.8rem);
+  font-size: clamp(0.65rem, 1.9vw, 0.8rem);
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -286,25 +293,20 @@ select {
   filter: brightness(1.1);
 }
 
-.controls-grid .btn:nth-child(1):hover { box-shadow: 0 0 14px var(--btn-new-glow); }
-.controls-grid .btn:nth-child(2):hover { box-shadow: 0 0 14px var(--btn-pause-glow); }
-.controls-grid .btn:nth-child(3):hover { box-shadow: 0 0 14px var(--btn-note-glow); }
-.controls-grid .btn:nth-child(4):hover { box-shadow: 0 0 14px var(--btn-hint-glow); }
-.controls-grid .btn:nth-child(5):hover { box-shadow: 0 0 14px var(--btn-erase-glow); }
-
-.controls-grid .btn:active { transform: scale(0.94); }
-
-/* Glowing Numpad Grid */
+/* Numpad Responsive Layout */
 .numpad {
   display: flex;
-  gap: 5px;
+  flex-wrap: wrap;
+  gap: 4px;
   width: 100%;
+  justify-content: center;
 }
 
 .num-btn {
-  flex: 1;
-  height: 44px;
-  font-size: 1.1rem;
+  flex: 1 0 10%;
+  min-width: 28px;
+  height: 40px;
+  font-size: 0.95rem;
   font-weight: 700;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
@@ -336,7 +338,7 @@ kbd {
   padding: 1px 4px;
 }
 
-/* Chart Container Fix */
+/* Chart Container */
 .chart-container {
   position: relative;
   width: 100%;
@@ -344,7 +346,7 @@ kbd {
   margin-top: 12px;
 }
 
-/* Overlay & Modals */
+/* Overlays and Modals */
 .overlay-screen {
   position: absolute;
   inset: 0;
@@ -363,7 +365,7 @@ kbd {
 
 .overlay-screen.active { display: flex; }
 
-/* Settings View Elements */
+/* Settings Card */
 .card {
   background: var(--surface-bg);
   padding: 16px;
@@ -393,12 +395,10 @@ kbd {
   box-shadow: 0 3px 8px var(--btn-erase-glow);
 }
 
-.btn-danger:hover { box-shadow: 0 0 14px var(--btn-erase-glow); }
-
 .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; inset: 0; background-color: var(--border-light); transition: .3s; border-radius: 24px; }
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
 input:checked + .slider { background-color: #3b82f6; }
 input:checked + .slider:before { transform: translateX(20px); }
-
+         
